@@ -51,19 +51,6 @@
         "Test"
       ],
       "position": null
-    },
-    {
-      "id": "LEh7DyKmzw",
-      "name": "Test Person",
-      "title": "VP Engineering",
-      "department": "Engineering",
-      "photo": null,
-      "managerId": null,
-      "sponsorId": null,
-      "tags": [
-        "Test"
-      ],
-      "position": null
     }
   ]
 }
