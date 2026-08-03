@@ -1,0 +1,19 @@
+{
+  "name": "orgchartr",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "frontend",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n SERVER,FRONTEND -c blue,green \"npm:dev:server\" \"npm:dev:frontend\"",
+    "dev:server": "npm run dev -w server",
+    "dev:frontend": "npm run dev -w frontend",
+    "build": "npm run build -w frontend && npm run build -w server",
+    "start": "npm run start -w server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

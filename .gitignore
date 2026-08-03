@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+*.log
+.DS_Store
+.env
+.env.local
+
+# Data is intentionally tracked (source of truth), but ignore OS/editor cruft inside it
+data/**/.DS_Store
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
