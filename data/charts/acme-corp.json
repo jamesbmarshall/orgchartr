@@ -10,7 +10,9 @@
       "photo": null,
       "managerId": null,
       "sponsorId": "ms-jane-doe",
-      "tags": ["Decision maker"],
+      "tags": [
+        "Decision maker"
+      ],
       "position": null
     },
     {
@@ -21,7 +23,9 @@
       "photo": null,
       "managerId": "p-ceo",
       "sponsorId": "ms-john-smith",
-      "tags": ["Technical champion"],
+      "tags": [
+        "Technical champion"
+      ],
       "position": null
     },
     {
@@ -33,6 +37,32 @@
       "managerId": "p-cto",
       "sponsorId": null,
       "tags": [],
+      "position": null
+    },
+    {
+      "id": "n3hy5SZ-so",
+      "name": "Test Person",
+      "title": "VP Engineering",
+      "department": "Engineering",
+      "photo": null,
+      "managerId": null,
+      "sponsorId": null,
+      "tags": [
+        "Test"
+      ],
+      "position": null
+    },
+    {
+      "id": "LEh7DyKmzw",
+      "name": "Test Person",
+      "title": "VP Engineering",
+      "department": "Engineering",
+      "photo": null,
+      "managerId": null,
+      "sponsorId": null,
+      "tags": [
+        "Test"
+      ],
       "position": null
     }
   ]
