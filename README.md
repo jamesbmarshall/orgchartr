@@ -4,7 +4,7 @@ A self-hosted org chart visualizer for tracking partner stakeholders and their M
 
 - One org chart per partner (or team) - add, edit, and remove people, and draw the reporting lines between them.
 - A shared, reusable directory of Microsoft employees ("sponsors") that you can link to any person on any chart.
-- Runs locally in Docker - no cloud hosting, no accounts. Your data lives as JSON files in this repo, so history is just `git log`.
+- Runs locally in Docker - no cloud hosting, no accounts. Your data lives as JSON files in a private, independent git repo (`data/`), so history is just `git log` - completely separate from the app code repo, so partner/sponsor data never has to be pushed to wherever you host this codebase.
 
 ## Requirements
 
@@ -47,13 +47,30 @@ Everything lives under [`/data`](data) at the repo root and is bind-mounted into
 - `data/sponsors.json` - the shared Microsoft sponsor directory
 - `data/assets/photos/` - uploaded photos
 
+**`data/` is its own independent git repository (`data/.git`), separate from the app code repo.** The root `.gitignore` excludes `data/` entirely, so cloning/pushing the app code never touches your org chart data. This means:
+
+- You can push this app's code to a public or shared remote (GitHub, etc.) without your partner/sponsor data going anywhere near it.
+- The data repo can have no remote at all (purely local history), or its own private remote (a private GitHub repo, a network share, etc.) - configure it independently:
+  ```powershell
+  cd data
+  git remote add origin <your-private-data-repo-url>
+  ```
+- The in-app **Commit changes** / **Push…** buttons operate on the `data/` repo, not the app code repo.
+
 Because it's just files in your working copy, you decide when to snapshot changes:
 
 1. Edit people/charts/sponsors in the app - each edit saves immediately (no export/import step).
-2. Click **Commit changes** in the toolbar when you want to checkpoint your edits into git history.
-3. Click **Push…** (with confirmation) if/when you want to send commits to your remote.
+2. Click **Commit changes** in the toolbar when you want to checkpoint your edits into `data/`'s git history.
+3. Click **Push…** (with confirmation) if/when you want to send those commits to the data repo's remote (if one is configured).
 
-You can also skip the buttons entirely and run `git add`, `git commit`, `git push` yourself from a terminal - the app doesn't require you to use them.
+You can also skip the buttons entirely and run `git add`, `git commit`, `git push` yourself from a terminal inside `data/` - the app doesn't require you to use them.
+
+### Setting up a fresh clone
+
+Since `data/` isn't part of the app code repo, a fresh clone of the app won't have any data. Either:
+
+- Start empty: just run the app - it seeds `data/charts/index.json` and `data/sponsors.json` with empty arrays on first run.
+- Restore your existing data: clone/copy your separate data repo into `data/` before running `docker compose up`.
 
 ## Local development (without Docker)
 
@@ -71,7 +88,7 @@ This runs the Express API on port 3001 and the Vite dev server (with hot reload)
 ```
 frontend/   React + TypeScript + React Flow canvas UI
 server/     Express + TypeScript API, reads/writes /data, git integration
-data/       JSON data + photos (git-tracked, source of truth)
+data/       JSON data + photos - its OWN independent git repo, gitignored by the app repo
 docker/     Container entrypoint script
 ```
 

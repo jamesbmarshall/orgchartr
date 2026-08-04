@@ -1,16 +1,13 @@
 import { execFile } from 'child_process';
-import path from 'path';
+import { DATA_DIR } from './dataStore';
 
-// The repo root as checked out on the host and bind-mounted into the container.
-// REPO_DIR env var wins (set in docker-compose); otherwise assume local dev layout
-// (server/src/lib -> ../../../ = repo root).
-const REPO_DIR = process.env.REPO_DIR
-  ? path.resolve(process.env.REPO_DIR)
-  : path.resolve(__dirname, '../../../');
-
+// data/ is its own independent git repo (separate from the app code repo), so
+// partner/sponsor data never has to live in the same remote as the app source.
+// Git commands run with DATA_DIR as the repo root - no pathspec scoping needed
+// since the whole repo IS the data.
 function git(args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile('git', args, { cwd: REPO_DIR }, (error, stdout, stderr) => {
+    execFile('git', args, { cwd: DATA_DIR }, (error, stdout, stderr) => {
       if (error) {
         reject(new Error(stderr?.trim() || error.message));
         return;
@@ -21,7 +18,7 @@ function git(args: string[]): Promise<string> {
 }
 
 export async function gitStatus(): Promise<{ clean: boolean; files: string[] }> {
-  const out = await git(['status', '--porcelain', '--', 'data']);
+  const out = await git(['status', '--porcelain']);
   const files = out ? out.split('\n').filter(Boolean) : [];
   return { clean: files.length === 0, files };
 }
@@ -31,7 +28,7 @@ export async function gitCommit(message: string): Promise<{ committed: boolean; 
   if (status.clean) {
     return { committed: false, output: 'Nothing to commit - working tree clean.' };
   }
-  await git(['add', '-A', '--', 'data']);
+  await git(['add', '-A']);
   const output = await git(['commit', '-m', message]);
   return { committed: true, output };
 }

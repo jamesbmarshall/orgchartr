@@ -18,7 +18,7 @@ FROM node:20-alpine AS runtime
 WORKDIR /app
 
 # git is required for the in-app "Commit changes" / "Push" actions, which run
-# git commands against the bind-mounted repo (.git) from inside the container.
+# git commands against data/.git (data's own independent repo) from inside the container.
 RUN apk add --no-cache git
 
 COPY package.json package-lock.json ./
@@ -34,7 +34,6 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV DATA_DIR=/app/data
-ENV REPO_DIR=/app
 ENV FRONTEND_DIST=/app/frontend/dist
 
 EXPOSE 3000

@@ -6,8 +6,10 @@ build/
 .env
 .env.local
 
-# Data is intentionally tracked (source of truth), but ignore OS/editor cruft inside it
-data/**/.DS_Store
+# Data is deliberately NOT part of this repo - it lives in its own local git repo
+# (data/.git) so partner/sponsor data never ends up in the app-code remote.
+# See README.md "Data storage" section.
+data/
 
 # Editor
 .vscode/*
