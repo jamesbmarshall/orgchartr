@@ -93,9 +93,8 @@ gh auth login --hostname github.com --git-protocol https --web   # run again, si
 
 `gh auth status` should then list both accounts as logged in under `github.com`.
 
-**3. Point each repo's remote at the matching account** by embedding the username in the HTTPS URL -
-this tells `gh`'s credential helper (`gh auth git-credential`, wired up automatically by `gh auth login`)
-exactly which of the two logged-in accounts to use, regardless of which one is currently "active":
+**3. Add each repo's remote as usual** (the embedded username is just for clarity - `gh`'s credential
+helper does **not** disambiguate by it, see note below):
 
 ```powershell
 # App code -> personal account
@@ -109,8 +108,17 @@ git remote add origin https://<your-emu-username>@github.com/<your-emu-org>/orgc
 git push -u origin master
 ```
 
-From then on, `git push` in each folder automatically uses the right identity - no manual switching
-required, and the in-app **Push…** button "just works" against whatever remote you've set on `data/`.
+**Important:** `gh`'s git credential helper always serves whichever account is currently "active" for
+`github.com` - it does not pick based on the username in the remote URL. So before pushing to whichever
+repo *isn't* the active account, switch first:
+
+```powershell
+gh auth switch --hostname github.com --user <your-personal-username>   # before pushing app code
+gh auth switch --hostname github.com --user <your-emu-username>        # before pushing data/
+```
+
+This also means the in-app **Push…** button will only succeed for the data repo when the EMU account is
+currently active in `gh` - switch to it before using that button if pushes start failing with an auth error.
 
 *Alternative:* if your EMU org disallows OAuth device flows or you'd rather use SSH, generate a separate
 SSH key per account, add `Host` aliases to `~/.ssh/config` (e.g. `github.com-personal` / `github.com-emu`,
