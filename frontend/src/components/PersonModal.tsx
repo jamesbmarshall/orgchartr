@@ -7,16 +7,19 @@ interface PersonModalProps {
   people: Person[];
   sponsors: Sponsor[];
   person?: Person;
+  onCreateSponsor: (name: string) => Promise<Sponsor>;
   onSave: (data: Partial<Person>) => Promise<void>;
   onClose: () => void;
 }
 
-export function PersonModal({ people, sponsors, person, onSave, onClose }: PersonModalProps) {
+export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave, onClose }: PersonModalProps) {
   const [name, setName] = useState(person?.name ?? '');
   const [title, setTitle] = useState(person?.title ?? '');
   const [department, setDepartment] = useState(person?.department ?? '');
   const [managerId, setManagerId] = useState<string>(person?.managerId ?? '');
-  const [sponsorId, setSponsorId] = useState<string>(person?.sponsorId ?? '');
+  const [sponsorName, setSponsorName] = useState(
+    sponsors.find((sponsor) => sponsor.id === person?.sponsorId)?.name ?? '',
+  );
   const [tags, setTags] = useState<string[]>(person?.tags ?? []);
   const [tagInput, setTagInput] = useState('');
   const [photo, setPhoto] = useState<string | null>(person?.photo ?? null);
@@ -61,12 +64,20 @@ export function PersonModal({ people, sponsors, person, onSave, onClose }: Perso
     setSaving(true);
     setError(null);
     try {
+      const normalizedSponsorName = sponsorName.trim();
+      const existingSponsor = sponsors.find(
+        (sponsor) => sponsor.name.trim().toLocaleLowerCase() === normalizedSponsorName.toLocaleLowerCase(),
+      );
+      const sponsor = normalizedSponsorName
+        ? existingSponsor ?? (await onCreateSponsor(normalizedSponsorName))
+        : null;
+
       await onSave({
         name: name.trim(),
         title: title.trim(),
         department: department.trim(),
         managerId: managerId || null,
-        sponsorId: sponsorId || null,
+        sponsorId: sponsor?.id ?? null,
         tags,
         photo,
       });
@@ -108,14 +119,18 @@ export function PersonModal({ people, sponsors, person, onSave, onClose }: Perso
           </label>
           <label>
             Microsoft sponsor
-            <select value={sponsorId} onChange={(e) => setSponsorId(e.target.value)}>
-              <option value="">(none)</option>
-              {sponsors.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} — {s.title}
+            <input
+              value={sponsorName}
+              onChange={(e) => setSponsorName(e.target.value)}
+              list="microsoft-sponsors"
+            />
+            <datalist id="microsoft-sponsors">
+              {sponsors.map((sponsor) => (
+                <option key={sponsor.id} value={sponsor.name}>
+                  {sponsor.title}
                 </option>
               ))}
-            </select>
+            </datalist>
           </label>
           <label>
             Tags

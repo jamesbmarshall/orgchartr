@@ -35,7 +35,7 @@ export function ChartView() {
     updatePerson,
     deletePerson,
   } = useChartStore();
-  const { sponsors, load: loadSponsors } = useSponsorStore();
+  const { sponsors, load: loadSponsors, addSponsor } = useSponsorStore();
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<PersonNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -160,6 +160,7 @@ export function ChartView() {
           people={activeChart.people}
           sponsors={sponsors}
           person={editingPerson === 'new' ? undefined : editingPerson}
+          onCreateSponsor={(name) => addSponsor({ name })}
           onSave={async (data) => {
             if (editingPerson === 'new') await addPerson(data);
             else await updatePerson(editingPerson.id, data);
