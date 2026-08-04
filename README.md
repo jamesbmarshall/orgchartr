@@ -83,52 +83,39 @@ the only wrinkle is authenticating as two identities on the same machine.
 - `github.com/<your-personal-username>/orgchartr` (public or private, your choice)
 - `github.com/<your-emu-org>/orgchartr-data` (private - required, since this holds partner/sponsor data)
 
-**2. Set up SSH so both identities work side-by-side.** This is the most reliable option, since EMU
-orgs often enforce SSO on tokens/keys and a single cached HTTPS credential can't serve two accounts for
-the same `github.com` host at once. Generate a separate key per account, then add `Host` aliases to
-`~/.ssh/config`:
+**2. Log both accounts into GitHub CLI** (`gh`), which handles multi-account credential resolution for
+you - no SSH keys needed. Run this once per account (each opens a browser device-code flow):
 
 ```powershell
-ssh-keygen -t ed25519 -C "personal" -f "$env:USERPROFILE\.ssh\id_ed25519_personal"
-ssh-keygen -t ed25519 -C "emu" -f "$env:USERPROFILE\.ssh\id_ed25519_emu"
+gh auth login --hostname github.com --git-protocol https --web   # sign in as your personal account
+gh auth login --hostname github.com --git-protocol https --web   # run again, sign in as your EMU account
 ```
 
-Add the `.pub` keys to the respective GitHub accounts (Settings → SSH and GPG keys). For the EMU key,
-you may also need to authorize it for SSO (Settings → SSH keys → **Configure SSO** next to the key,
-if your EMU org enforces it). Then in `~/.ssh/config`:
+`gh auth status` should then list both accounts as logged in under `github.com`.
 
-```
-Host github.com-personal
-  HostName github.com
-  User git
-  IdentityFile ~/.ssh/id_ed25519_personal
-
-Host github.com-emu
-  HostName github.com
-  User git
-  IdentityFile ~/.ssh/id_ed25519_emu
-```
-
-**3. Point each repo's remote at the matching host alias:**
+**3. Point each repo's remote at the matching account** by embedding the username in the HTTPS URL -
+this tells `gh`'s credential helper (`gh auth git-credential`, wired up automatically by `gh auth login`)
+exactly which of the two logged-in accounts to use, regardless of which one is currently "active":
 
 ```powershell
 # App code -> personal account
 cd c:\GitHub\orgchartr
-git remote add origin git@github.com-personal:<your-personal-username>/orgchartr.git
+git remote add origin https://<your-personal-username>@github.com/<your-personal-username>/orgchartr.git
 git push -u origin master
 
 # Data -> EMU private repo
 cd data
-git remote add origin git@github.com-emu:<your-emu-org>/orgchartr-data.git
+git remote add origin https://<your-emu-username>@github.com/<your-emu-org>/orgchartr-data.git
 git push -u origin master
 ```
 
-From then on, `git push` in each folder automatically uses the right identity - no switching required,
-and the in-app **Push…** button "just works" against whatever remote you've set on `data/`.
+From then on, `git push` in each folder automatically uses the right identity - no manual switching
+required, and the in-app **Push…** button "just works" against whatever remote you've set on `data/`.
 
-*Alternative:* if your EMU org allows it, you can instead use `gh auth login` to add the EMU account to
-GitHub CLI, then `gh auth switch` before pushing to the data repo over HTTPS - simpler to set up, but
-easier to forget to switch and push from the wrong identity, so SSH aliases are recommended for regular use.
+*Alternative:* if your EMU org disallows OAuth device flows or you'd rather use SSH, generate a separate
+SSH key per account, add `Host` aliases to `~/.ssh/config` (e.g. `github.com-personal` / `github.com-emu`,
+each with its own `IdentityFile`), add each public key to the matching GitHub account, and use
+`git@github.com-<alias>:<owner>/<repo>.git` as the remote URL instead.
 
 ## Local development (without Docker)
 
