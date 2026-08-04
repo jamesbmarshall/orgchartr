@@ -1,4 +1,5 @@
 import { Handle, Position as FlowPosition, type NodeProps } from '@xyflow/react';
+import { Pencil, Trash2 } from 'lucide-react';
 import type { Person, Sponsor } from '../types';
 import { photoUrl } from '../api/client';
 
@@ -55,11 +56,23 @@ export function PersonNode({ data }: NodeProps & { data: PersonNodeData }) {
       )}
 
       <div className="person-node__actions">
-        <button type="button" onClick={() => onEdit(person)}>
-          Edit
+        <button
+          type="button"
+          className="person-node__action nodrag"
+          title="Edit person"
+          aria-label={`Edit ${person.name}`}
+          onClick={() => onEdit(person)}
+        >
+          <Pencil aria-hidden="true" />
         </button>
-        <button type="button" className="danger" onClick={() => onDelete(person)}>
-          Remove
+        <button
+          type="button"
+          className="person-node__action danger nodrag"
+          title="Remove person"
+          aria-label={`Remove ${person.name}`}
+          onClick={() => onDelete(person)}
+        >
+          <Trash2 aria-hidden="true" />
         </button>
       </div>
 

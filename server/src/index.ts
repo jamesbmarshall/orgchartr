@@ -6,7 +6,6 @@ import { ensureDataDirs, PHOTOS_DIR } from './lib/dataStore';
 import chartsRouter from './routes/charts';
 import sponsorsRouter from './routes/sponsors';
 import photosRouter from './routes/photos';
-import gitRouter from './routes/git';
 
 ensureDataDirs();
 
@@ -23,7 +22,6 @@ app.use(express.json({ limit: '2mb' }));
 app.use('/api/charts', chartsRouter);
 app.use('/api/sponsors', sponsorsRouter);
 app.use('/api/photos', photosRouter);
-app.use('/api/git', gitRouter);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 

@@ -178,28 +178,6 @@ select {
   flex: 1;
 }
 
-.git-panel {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-left: auto;
-  font-size: 0.85rem;
-}
-
-.git-panel__status--dirty {
-  color: #f5c26b;
-}
-
-.git-panel__status--clean {
-  color: var(--success);
-}
-
-.git-panel__push-confirm {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
 .person-node {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -279,13 +257,22 @@ select {
 
 .person-node__actions {
   display: flex;
-  gap: 0.4rem;
+  gap: 0.3rem;
   margin-top: 0.6rem;
 }
 
-.person-node__actions button {
-  font-size: 0.75rem;
-  padding: 0.25rem 0.5rem;
+.person-node__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+.person-node__action svg {
+  width: 14px;
+  height: 14px;
 }
 
 .modal-overlay {

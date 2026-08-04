@@ -84,11 +84,15 @@ export const useChartStore = create<ChartStoreState>((set, get) => ({
     const active = get().activeChart;
     if (!active) throw new Error('No active chart loaded');
     const updated = await api.updatePerson(active.id, personId, patch);
-    set({
-      activeChart: {
-        ...active,
-        people: active.people.map((p) => (p.id === personId ? updated : p)),
-      },
+    set((state) => {
+      const current = state.activeChart;
+      if (!current || current.id !== active.id) return {};
+      return {
+        activeChart: {
+          ...current,
+          people: current.people.map((p) => (p.id === personId ? updated : p)),
+        },
+      };
     });
   },
 

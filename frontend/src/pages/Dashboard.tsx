@@ -69,7 +69,7 @@ export function Dashboard() {
       {pendingDelete && (
         <ConfirmDialog
           title="Delete chart"
-          message="This permanently deletes the chart and all its people. This cannot be undone unless you have a prior git commit."
+          message="This permanently deletes the chart and all its people. This cannot be undone unless your storage provider has a recoverable backup."
           confirmLabel="Delete"
           danger
           onConfirm={async () => {

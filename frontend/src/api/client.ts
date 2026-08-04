@@ -1,4 +1,4 @@
-import type { Chart, ChartIndexEntry, GitStatus, Person, Sponsor } from '../types';
+import type { Chart, ChartIndexEntry, Person, Sponsor } from '../types';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -60,14 +60,6 @@ export const api = {
     return res.json();
   },
 
-  // Git
-  gitStatus: () => request<GitStatus>('/api/git/status'),
-  gitCommit: (message: string) =>
-    request<{ committed: boolean; output: string }>('/api/git/commit', {
-      method: 'POST',
-      body: JSON.stringify({ message }),
-    }),
-  gitPush: () => request<{ pushed: boolean; output: string }>('/api/git/push', { method: 'POST' }),
 };
 
 export function photoUrl(filename: string | null): string | null {

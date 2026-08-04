@@ -18,7 +18,6 @@ import { computeAutoLayout } from '../layout/autoLayout';
 import { PersonNode, type PersonNodeData } from '../components/PersonNode';
 import { PersonModal } from '../components/PersonModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { GitPanel } from '../components/GitPanel';
 import type { Person } from '../types';
 
 const nodeTypes = { person: PersonNode };
@@ -137,7 +136,6 @@ export function ChartView() {
             Reset layout
           </button>
         </div>
-        <GitPanel />
       </div>
 
       <div className="chart-canvas">
@@ -148,6 +146,7 @@ export function ChartView() {
           onEdgesChange={onEdgesChange}
           onNodeDragStop={onNodeDragStop}
           nodeTypes={nodeTypes}
+          colorMode="dark"
           fitView
         >
           <Background />

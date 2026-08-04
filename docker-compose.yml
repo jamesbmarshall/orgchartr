@@ -6,12 +6,7 @@ services:
     ports:
       - '3000:3000'
     volumes:
-      # Data (JSON + photos) is bind-mounted so edits land directly on your files.
-      # data/ is its own independent git repo (data/.git), separate from the app code repo,
-      # so this single mount also brings that repo's history along automatically.
-      - ./data:/app/data
-    environment:
-      # Identity used for commits made via the app's "Commit changes" button.
-      GIT_AUTHOR_NAME: ${GIT_AUTHOR_NAME:-orgchartr}
-      GIT_AUTHOR_EMAIL: ${GIT_AUTHOR_EMAIL:-orgchartr@localhost}
+      - type: bind
+        source: ${ORGCHARTR_DATA_DIR:-./data}
+        target: /app/data
     restart: unless-stopped

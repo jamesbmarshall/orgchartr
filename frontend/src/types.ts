@@ -36,8 +36,3 @@ export interface Sponsor {
   photo: string | null;
   tags: string[];
 }
-
-export interface GitStatus {
-  clean: boolean;
-  files: string[];
-}
