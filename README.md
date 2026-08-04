@@ -72,6 +72,64 @@ Since `data/` isn't part of the app code repo, a fresh clone of the app won't ha
 - Start empty: just run the app - it seeds `data/charts/index.json` and `data/sponsors.json` with empty arrays on first run.
 - Restore your existing data: clone/copy your separate data repo into `data/` before running `docker compose up`.
 
+### Using two different GitHub accounts (e.g. personal for app code, EMU for data)
+
+Because the app repo and `data/` are independent git repos, they can live under two entirely different
+GitHub accounts/orgs - for example, the app code in your personal GitHub account, and the private data
+repo in a work EMU (Enterprise Managed User) account. Git doesn't care that they're different accounts;
+the only wrinkle is authenticating as two identities on the same machine.
+
+**1. Create the two repos on GitHub first** (via the web UI or `gh repo create`), e.g.:
+- `github.com/<your-personal-username>/orgchartr` (public or private, your choice)
+- `github.com/<your-emu-org>/orgchartr-data` (private - required, since this holds partner/sponsor data)
+
+**2. Set up SSH so both identities work side-by-side.** This is the most reliable option, since EMU
+orgs often enforce SSO on tokens/keys and a single cached HTTPS credential can't serve two accounts for
+the same `github.com` host at once. Generate a separate key per account, then add `Host` aliases to
+`~/.ssh/config`:
+
+```powershell
+ssh-keygen -t ed25519 -C "personal" -f "$env:USERPROFILE\.ssh\id_ed25519_personal"
+ssh-keygen -t ed25519 -C "emu" -f "$env:USERPROFILE\.ssh\id_ed25519_emu"
+```
+
+Add the `.pub` keys to the respective GitHub accounts (Settings → SSH and GPG keys). For the EMU key,
+you may also need to authorize it for SSO (Settings → SSH keys → **Configure SSO** next to the key,
+if your EMU org enforces it). Then in `~/.ssh/config`:
+
+```
+Host github.com-personal
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519_personal
+
+Host github.com-emu
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519_emu
+```
+
+**3. Point each repo's remote at the matching host alias:**
+
+```powershell
+# App code -> personal account
+cd c:\GitHub\orgchartr
+git remote add origin git@github.com-personal:<your-personal-username>/orgchartr.git
+git push -u origin master
+
+# Data -> EMU private repo
+cd data
+git remote add origin git@github.com-emu:<your-emu-org>/orgchartr-data.git
+git push -u origin master
+```
+
+From then on, `git push` in each folder automatically uses the right identity - no switching required,
+and the in-app **Push…** button "just works" against whatever remote you've set on `data/`.
+
+*Alternative:* if your EMU org allows it, you can instead use `gh auth login` to add the EMU account to
+GitHub CLI, then `gh auth switch` before pushing to the data repo over HTTPS - simpler to set up, but
+easier to forget to switch and push from the wrong identity, so SSH aliases are recommended for regular use.
+
 ## Local development (without Docker)
 
 Requires Node.js 20+.
