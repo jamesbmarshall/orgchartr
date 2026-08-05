@@ -278,7 +278,7 @@ select {
   border-left: 4px solid var(--person-edge, var(--border));
   border-radius: 10px;
   padding: 0.75rem;
-  width: 220px;
+  width: var(--person-width, 220px);
   color: var(--person-text, var(--text));
 }
 
@@ -311,8 +311,6 @@ select {
 
 .person-node__name {
   font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -470,6 +468,14 @@ select {
 
 .modal form .person-colors__fields label {
   margin-bottom: 0;
+}
+
+.modal form .person-colors__background-toggle {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 0;
+  color: var(--text);
 }
 
 .person-colors input[type='color'] {

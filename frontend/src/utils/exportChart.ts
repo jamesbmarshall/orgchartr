@@ -1,5 +1,5 @@
 import type { Person, Sponsor } from '../types';
-import { computeAutoLayout, NODE_WIDTH, NODE_HEIGHT } from '../layout/autoLayout';
+import { computeAutoLayout, NODE_HEIGHT, personNodeWidth } from '../layout/autoLayout';
 import { photoUrl } from '../api/client';
 import { colorLegendEntries, readableTextColor } from './personColors';
 
@@ -80,14 +80,13 @@ export async function buildSvg(people: Person[], { title, sponsorById }: SvgOpti
   const positions = computeAutoLayout(people, true);
   const placed = people.map((person) => {
     const pos = positions.get(person.id) ?? { x: 0, y: 0 };
-    // dagre returns node centres; convert to top-left corners.
-    return { person, x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 };
+    return { person, x: pos.x, y: pos.y };
   });
   const byId = new Map(placed.map((entry) => [entry.person.id, entry]));
 
   const minX = Math.min(...placed.map((n) => n.x));
   const minY = Math.min(...placed.map((n) => n.y));
-  const maxX = Math.max(...placed.map((n) => n.x + NODE_WIDTH));
+  const maxX = Math.max(...placed.map((n) => n.x + personNodeWidth(n.person.name)));
   const maxY = Math.max(...placed.map((n) => n.y + NODE_HEIGHT));
   const offsetX = MARGIN - minX;
   const offsetY = MARGIN + TITLE_HEIGHT - minY;
@@ -103,9 +102,11 @@ export async function buildSvg(people: Person[], { title, sponsorById }: SvgOpti
     .filter(({ person }) => person.managerId && byId.has(person.managerId))
     .map(({ person, x, y }) => {
       const manager = byId.get(person.managerId as string)!;
-      const x1 = manager.x + offsetX + NODE_WIDTH / 2;
+      const managerWidth = personNodeWidth(manager.person.name);
+      const personWidth = personNodeWidth(person.name);
+      const x1 = manager.x + offsetX + managerWidth / 2;
       const y1 = manager.y + offsetY + NODE_HEIGHT;
-      const x2 = x + offsetX + NODE_WIDTH / 2;
+      const x2 = x + offsetX + personWidth / 2;
       const y2 = y + offsetY;
       const mid = (y1 + y2) / 2;
       return `<path d="M ${x1} ${y1} V ${mid} H ${x2} V ${y2}" fill="none" stroke="#b4bcc9" stroke-width="1.5" />`;
@@ -116,6 +117,7 @@ export async function buildSvg(people: Person[], { title, sponsorById }: SvgOpti
     .map(({ person, x, y }) => {
       const left = x + offsetX;
       const top = y + offsetY;
+      const nodeWidth = personNodeWidth(person.name);
       const photo = photos.get(person.id);
       const backgroundColor = person.backgroundColor ?? '#ffffff';
       const edgeColor = person.edgeColor ?? '#d5dae3';
@@ -134,9 +136,7 @@ export async function buildSvg(people: Person[], { title, sponsorById }: SvgOpti
           )}</text>`;
 
       const lines: string[] = [
-        `<text x="${left + 58}" y="${top + 28}" font-size="14" font-weight="600" fill="${textColor}">${escapeXml(
-          truncate(person.name, 24),
-        )}</text>`,
+        `<text x="${left + 58}" y="${top + 28}" font-size="14" font-weight="600" fill="${textColor}">${escapeXml(person.name)}</text>`,
       ];
       if (person.title) {
         lines.push(
@@ -161,7 +161,7 @@ export async function buildSvg(people: Person[], { title, sponsorById }: SvgOpti
 
       return (
         `<g>` +
-        `<rect x="${left}" y="${top}" width="${NODE_WIDTH}" height="${NODE_HEIGHT}" rx="10" ` +
+        `<rect x="${left}" y="${top}" width="${nodeWidth}" height="${NODE_HEIGHT}" rx="10" ` +
         `fill="${backgroundColor}" stroke="#d5dae3" stroke-width="1.5" />` +
         `<path d="M ${left + 2} ${top + 10} V ${top + NODE_HEIGHT - 10}" stroke="${edgeColor}" stroke-width="4" stroke-linecap="round" />` +
         avatar +
@@ -176,7 +176,7 @@ export async function buildSvg(people: Person[], { title, sponsorById }: SvgOpti
       <text x="0" y="0" font-size="13" font-weight="600" fill="#1a1d24">Colour key</text>
       ${legendEntries.map((entry, index) => {
         const rowY = 12 + index * LEGEND_ROW_HEIGHT;
-        return `<rect x="0" y="${rowY}" width="30" height="16" rx="4" fill="${entry.backgroundColor}" stroke="#d5dae3" stroke-width="1.5" />` +
+        return `<rect x="0" y="${rowY}" width="30" height="16" rx="4" fill="${entry.backgroundColor ?? '#ffffff'}" stroke="#d5dae3" stroke-width="1.5" />` +
           `<path d="M 2 ${rowY + 4} V ${rowY + 12}" stroke="${entry.edgeColor}" stroke-width="4" stroke-linecap="round" />` +
           `<text x="40" y="${rowY + 12}" font-size="11" fill="#3f4652">${escapeXml(entry.label)}</text>`;
       }).join('')}

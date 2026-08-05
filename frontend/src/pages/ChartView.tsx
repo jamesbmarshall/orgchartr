@@ -22,6 +22,8 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ExportModal } from '../components/ExportModal';
 import type { Person } from '../types';
 import { colorLegendEntries } from '../utils/personColors';
+import { comparePeopleBySurname } from '../utils/personNames';
+import { getDescendantIds } from '../utils/orgTree';
 
 const nodeTypes = { person: PersonNode };
 
@@ -51,6 +53,7 @@ export function ChartView() {
   const [sponsorFilter, setSponsorFilter] = useState('');
   const [managerFilter, setManagerFilter] = useState('');
   const [tagFilter, setTagFilter] = useState('');
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (chartId) loadChart(chartId);
@@ -64,7 +67,7 @@ export function ChartView() {
     () =>
       (activeChart?.people ?? [])
         .filter((person) => activeChart?.people.some((report) => report.managerId === person.id))
-        .toSorted((a, b) => a.name.localeCompare(b.name)),
+        .toSorted(comparePeopleBySurname),
     [activeChart],
   );
   const tagOptions = useMemo(
@@ -81,12 +84,31 @@ export function ChartView() {
       ),
     [activeChart, managerFilter, sponsorFilter, tagFilter],
   );
+  const hiddenDescendantIds = useMemo(() => {
+    const hidden = new Set<string>();
+    for (const personId of collapsedIds) {
+      for (const descendantId of getDescendantIds(activeChart?.people ?? [], personId)) hidden.add(descendantId);
+    }
+    return hidden;
+  }, [activeChart, collapsedIds]);
+  const displayedPeople = useMemo(
+    () => visiblePeople.filter((person) => !hiddenDescendantIds.has(person.id)),
+    [hiddenDescendantIds, visiblePeople],
+  );
   const filtersActive = Boolean(sponsorFilter || managerFilter || tagFilter);
   const activeFilterCount = [sponsorFilter, managerFilter, tagFilter].filter(Boolean).length;
-  const legendEntries = useMemo(() => colorLegendEntries(visiblePeople), [visiblePeople]);
+  const legendEntries = useMemo(() => colorLegendEntries(displayedPeople), [displayedPeople]);
 
   const handleEdit = useCallback((person: Person) => setEditingPerson(person), []);
   const handleDelete = useCallback((person: Person) => setPendingDelete(person), []);
+  const handleToggleCollapsed = useCallback((personId: string) => {
+    setCollapsedIds((current) => {
+      const next = new Set(current);
+      if (next.has(personId)) next.delete(personId);
+      else next.add(personId);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!activeChart) {
@@ -95,8 +117,8 @@ export function ChartView() {
       return;
     }
     const autoPositions = computeAutoLayout(activeChart.people, false);
-    const visibleIds = new Set(visiblePeople.map((person) => person.id));
-    const newNodes: Node<PersonNodeData>[] = visiblePeople.map((person) => ({
+    const visibleIds = new Set(displayedPeople.map((person) => person.id));
+    const newNodes: Node<PersonNodeData>[] = displayedPeople.map((person) => ({
       id: person.id,
       type: 'person',
       position: person.position ?? autoPositions.get(person.id) ?? { x: 0, y: 0 },
@@ -106,17 +128,20 @@ export function ChartView() {
           const sponsor = sponsorById.get(id);
           return sponsor ? [sponsor] : [];
         }),
+        hasDirectReports: activeChart.people.some((report) => report.managerId === person.id),
+        collapsed: collapsedIds.has(person.id),
+        onToggleCollapsed: handleToggleCollapsed,
         onEdit: handleEdit,
         onDelete: handleDelete,
       },
     }));
-    const newEdges: Edge[] = visiblePeople
+    const newEdges: Edge[] = displayedPeople
       .filter((person) => person.managerId && visibleIds.has(person.managerId))
       .map((p) => ({ id: `${p.managerId}-${p.id}`, source: p.managerId as string, target: p.id }));
     setNodes(newNodes);
     setEdges(newEdges);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeChart, visiblePeople, sponsorById, handleEdit, handleDelete]);
+  }, [activeChart, displayedPeople, sponsorById, collapsedIds, handleToggleCollapsed, handleEdit, handleDelete]);
 
   const onNodeDragStop: OnNodeDrag<Node<PersonNodeData>> = useCallback(
     (_event, node) => {
@@ -273,7 +298,10 @@ export function ChartView() {
                 <div key={`${entry.label}-${entry.edgeColor}-${entry.backgroundColor}`} className="chart-legend__entry">
                   <span
                     className="chart-legend__swatch"
-                    style={{ backgroundColor: entry.backgroundColor, borderLeftColor: entry.edgeColor }}
+                    style={{
+                      backgroundColor: entry.backgroundColor ?? 'var(--surface)',
+                      borderLeftColor: entry.edgeColor,
+                    }}
                     aria-hidden="true"
                   />
                   <span>{entry.label}</span>

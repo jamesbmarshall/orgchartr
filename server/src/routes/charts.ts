@@ -21,6 +21,7 @@ type StoredPerson = Omit<Person, 'sponsorIds'> & {
 };
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+const LEGACY_DEFAULT_BACKGROUND = '#1a1d24';
 
 function parseColor(value: unknown): string | null {
   return typeof value === 'string' && HEX_COLOR.test(value) ? value : null;
@@ -49,7 +50,9 @@ function loadChart(id: string): Chart | null {
       ...person,
       sponsorIds: Array.isArray(person.sponsorIds) ? person.sponsorIds : sponsorId ? [sponsorId] : [],
       edgeColor: parseColor(person.edgeColor),
-      backgroundColor: parseColor(person.backgroundColor),
+      backgroundColor: person.backgroundColor?.toLocaleLowerCase() === LEGACY_DEFAULT_BACKGROUND
+        ? null
+        : parseColor(person.backgroundColor),
       colorLabel: typeof person.colorLabel === 'string' ? person.colorLabel : '',
     })),
   };

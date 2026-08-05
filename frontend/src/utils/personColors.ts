@@ -3,11 +3,11 @@ import type { Person } from '../types';
 export interface ColorLegendEntry {
   label: string;
   edgeColor: string;
-  backgroundColor: string;
+  backgroundColor: string | null;
 }
 
 export function colorSchemeKey({ label, edgeColor, backgroundColor }: ColorLegendEntry): string {
-  return `${label.toLocaleLowerCase()}|${edgeColor.toLocaleLowerCase()}|${backgroundColor.toLocaleLowerCase()}`;
+  return `${label.toLocaleLowerCase()}|${edgeColor.toLocaleLowerCase()}|${backgroundColor?.toLocaleLowerCase() ?? 'default'}`;
 }
 
 export function readableTextColor(backgroundColor: string): '#16181d' | '#f7f8fa' {
@@ -21,7 +21,7 @@ export function readableTextColor(backgroundColor: string): '#16181d' | '#f7f8fa
 export function colorLegendEntries(people: Person[]): ColorLegendEntry[] {
   const entries = new Map<string, ColorLegendEntry>();
   for (const person of people) {
-    if (!person.edgeColor || !person.backgroundColor || !person.colorLabel.trim()) continue;
+    if (!person.edgeColor || !person.colorLabel.trim()) continue;
     const entry = {
       label: person.colorLabel.trim(),
       edgeColor: person.edgeColor,

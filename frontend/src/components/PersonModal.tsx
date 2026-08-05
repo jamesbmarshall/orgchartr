@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import type { Person, Sponsor } from '../types';
 import { getDescendantIds } from '../utils/orgTree';
 import { colorLegendEntries, colorSchemeKey, readableTextColor } from '../utils/personColors';
+import { comparePeopleBySurname } from '../utils/personNames';
 import { api, photoUrl } from '../api/client';
 
 interface PersonModalProps {
@@ -15,7 +16,7 @@ interface PersonModalProps {
 
 export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave, onClose }: PersonModalProps) {
   const colorSchemes = colorLegendEntries(people);
-  const currentSchemeKey = person?.edgeColor && person.backgroundColor && person.colorLabel
+  const currentSchemeKey = person?.edgeColor && person.colorLabel
     ? colorSchemeKey({
         label: person.colorLabel,
         edgeColor: person.edgeColor,
@@ -40,6 +41,7 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
     Boolean(person?.edgeColor || person?.backgroundColor || person?.colorLabel),
   );
   const [edgeColor, setEdgeColor] = useState(person?.edgeColor ?? '#7caf78');
+  const [useCustomBackground, setUseCustomBackground] = useState(Boolean(person?.backgroundColor));
   const [backgroundColor, setBackgroundColor] = useState(person?.backgroundColor ?? '#1a1d24');
   const [colorLabel, setColorLabel] = useState(person?.colorLabel ?? '');
   const [selectedSchemeKey, setSelectedSchemeKey] = useState(
@@ -50,7 +52,15 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
   const [error, setError] = useState<string | null>(null);
 
   const excludedManagerIds = person ? new Set([person.id, ...getDescendantIds(people, person.id)]) : new Set<string>();
-  const managerOptions = people.filter((p) => !excludedManagerIds.has(p.id));
+  const managerOptions = people.filter((p) => !excludedManagerIds.has(p.id)).toSorted(comparePeopleBySurname);
+  const departmentOptions = [
+    ...new Map(
+      people
+        .map((candidate) => candidate.department.trim())
+        .filter(Boolean)
+        .map((value) => [value.toLocaleLowerCase(), value]),
+    ).values(),
+  ].toSorted((a, b) => a.localeCompare(b));
 
   function addTag() {
     const value = tagInput.trim();
@@ -81,7 +91,8 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
     if (!scheme) return;
     setColorLabel(scheme.label);
     setEdgeColor(scheme.edgeColor);
-    setBackgroundColor(scheme.backgroundColor);
+    setUseCustomBackground(Boolean(scheme.backgroundColor));
+    if (scheme.backgroundColor) setBackgroundColor(scheme.backgroundColor);
   }
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -137,7 +148,7 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
         tags,
         photo,
         edgeColor: useColorCoding ? edgeColor : null,
-        backgroundColor: useColorCoding ? backgroundColor : null,
+        backgroundColor: useColorCoding && useCustomBackground ? backgroundColor : null,
         colorLabel: useColorCoding ? colorLabel.trim() : '',
       });
     } catch (err) {
@@ -163,7 +174,17 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
           </label>
           <label>
             Department
-            <input value={department} onChange={(e) => setDepartment(e.target.value)} />
+            <input
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              list="departments"
+              autoComplete="off"
+            />
+            <datalist id="departments">
+              {departmentOptions.map((option) => (
+                <option key={option} value={option} />
+              ))}
+            </datalist>
           </label>
           <label>
             Manager
@@ -304,13 +325,27 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
                       setBackgroundColor(event.target.value);
                       setSelectedSchemeKey('custom');
                     }}
-                    disabled={selectedSchemeKey !== 'custom'}
+                    disabled={selectedSchemeKey !== 'custom' || !useCustomBackground}
                     aria-label="Pill background colour"
                   />
                 </label>
+                <label className="person-colors__background-toggle">
+                  <input
+                    type="checkbox"
+                    checked={useCustomBackground}
+                    onChange={(event) => {
+                      setUseCustomBackground(event.target.checked);
+                      setSelectedSchemeKey('custom');
+                    }}
+                    disabled={selectedSchemeKey !== 'custom'}
+                  />
+                  Custom background
+                </label>
                 <div
                   className="person-colors__preview"
-                  style={{ backgroundColor, borderLeftColor: edgeColor, color: readableTextColor(backgroundColor) }}
+                  style={useCustomBackground
+                    ? { backgroundColor, borderLeftColor: edgeColor, color: readableTextColor(backgroundColor) }
+                    : { borderLeftColor: edgeColor }}
                   aria-label="Colour preview"
                 >
                   {colorLabel.trim() || 'Preview'}

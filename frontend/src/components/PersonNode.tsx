@@ -1,13 +1,17 @@
 import { Handle, Position as FlowPosition, type NodeProps } from '@xyflow/react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import type { Person, Sponsor } from '../types';
 import { photoUrl } from '../api/client';
 import { readableTextColor } from '../utils/personColors';
+import { personNodeWidth } from '../layout/autoLayout';
 
 export interface PersonNodeData extends Record<string, unknown> {
   person: Person;
   sponsors: Sponsor[];
+  hasDirectReports: boolean;
+  collapsed: boolean;
+  onToggleCollapsed: (personId: string) => void;
   onEdit: (person: Person) => void;
   onDelete: (person: Person) => void;
 }
@@ -22,7 +26,7 @@ function initials(name: string): string {
 }
 
 export function PersonNode({ data }: NodeProps & { data: PersonNodeData }) {
-  const { person, sponsors, onEdit, onDelete } = data;
+  const { person, sponsors, hasDirectReports, collapsed, onToggleCollapsed, onEdit, onDelete } = data;
   const photo = photoUrl(person.photo);
   const backgroundColor = person.backgroundColor ?? 'var(--surface)';
   const edgeColor = person.edgeColor ?? 'var(--border)';
@@ -31,6 +35,7 @@ export function PersonNode({ data }: NodeProps & { data: PersonNodeData }) {
     '--person-background': backgroundColor,
     '--person-edge': edgeColor,
     '--person-text': textColor,
+    '--person-width': `${personNodeWidth(person.name)}px`,
   } as CSSProperties;
 
   return (
@@ -66,6 +71,18 @@ export function PersonNode({ data }: NodeProps & { data: PersonNodeData }) {
       )}
 
       <div className="person-node__actions">
+        {hasDirectReports && (
+          <button
+            type="button"
+            className="person-node__action nodrag"
+            title={collapsed ? 'Expand branch' : 'Collapse branch'}
+            aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${person.name}'s branch`}
+            aria-expanded={!collapsed}
+            onClick={() => onToggleCollapsed(person.id)}
+          >
+            {collapsed ? <ChevronRight aria-hidden="true" /> : <ChevronDown aria-hidden="true" />}
+          </button>
+        )}
         <button
           type="button"
           className="person-node__action nodrag"
