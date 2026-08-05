@@ -18,6 +18,7 @@ import { computeAutoLayout } from '../layout/autoLayout';
 import { PersonNode, type PersonNodeData } from '../components/PersonNode';
 import { PersonModal } from '../components/PersonModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ExportModal } from '../components/ExportModal';
 import type { Person } from '../types';
 
 const nodeTypes = { person: PersonNode };
@@ -41,6 +42,7 @@ export function ChartView() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [editingPerson, setEditingPerson] = useState<Person | 'new' | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Person | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
 
@@ -132,6 +134,9 @@ export function ChartView() {
           <button type="button" className="primary" onClick={() => setEditingPerson('new')}>
             Add person
           </button>
+          <button type="button" onClick={() => setExporting(true)}>
+            Export
+          </button>
           <button type="button" onClick={handleResetLayout}>
             Reset layout
           </button>
@@ -154,6 +159,15 @@ export function ChartView() {
           <MiniMap pannable zoomable />
         </ReactFlow>
       </div>
+
+      {exporting && (
+        <ExportModal
+          partnerName={activeChart.partnerName}
+          people={activeChart.people}
+          sponsors={sponsors}
+          onClose={() => setExporting(false)}
+        />
+      )}
 
       {editingPerson && (
         <PersonModal
