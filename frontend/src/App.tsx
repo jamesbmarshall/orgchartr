@@ -2,6 +2,7 @@ import { HashRouter, Routes, Route } from 'react-router';
 import { Dashboard } from './pages/Dashboard';
 import { ChartView } from './pages/ChartView';
 import { Sponsors } from './pages/Sponsors';
+import { UndoToast } from './components/UndoToast';
 
 export function App() {
   return (
@@ -11,6 +12,7 @@ export function App() {
         <Route path="/chart/:chartId" element={<ChartView />} />
         <Route path="/sponsors" element={<Sponsors />} />
       </Routes>
+      <UndoToast />
     </HashRouter>
   );
 }

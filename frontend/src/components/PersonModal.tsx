@@ -163,6 +163,13 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="person-modal-title">
       <div className="modal">
         <h2 id="person-modal-title">{person ? 'Edit person' : 'Add person'}</h2>
+        {person && (person.createdAt || person.updatedAt) && (
+          <p className="timestamp-note">
+            {person.createdAt && `Added ${new Date(person.createdAt).toLocaleString()}`}
+            {person.createdAt && person.updatedAt && ' · '}
+            {person.updatedAt && `Last updated ${new Date(person.updatedAt).toLocaleString()}`}
+          </p>
+        )}
         <form onSubmit={handleSubmit}>
           <label>
             Name

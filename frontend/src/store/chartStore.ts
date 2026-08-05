@@ -21,6 +21,7 @@ interface ChartStoreState {
   addPerson: (data: Partial<Person>) => Promise<Person>;
   updatePerson: (personId: string, patch: Partial<Person>) => Promise<void>;
   deletePerson: (personId: string) => Promise<void>;
+  updatePositions: (positions: Record<string, { x: number; y: number }>) => Promise<void>;
 }
 
 export const useChartStore = create<ChartStoreState>((set, get) => ({
@@ -102,5 +103,12 @@ export const useChartStore = create<ChartStoreState>((set, get) => ({
     await api.deletePerson(active.id, personId);
     // Reload from server since deleting can reparent other people's managerId.
     await get().loadChart(active.id);
+  },
+
+  updatePositions: async (positions: Record<string, { x: number; y: number }>) => {
+    const active = get().activeChart;
+    if (!active) throw new Error('No active chart loaded');
+    const updated = await api.updatePositions(active.id, positions);
+    set((state) => (state.activeChart?.id === active.id ? { activeChart: updated } : {}));
   },
 }));

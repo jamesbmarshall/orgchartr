@@ -16,6 +16,9 @@ export interface Person {
   backgroundColor: string | null;
   colorLabel: string;
   position: Position | null;
+  /** ISO timestamps. Null for records created before this field existed. */
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 export interface Chart {
@@ -38,4 +41,6 @@ export interface Sponsor {
   department: string;
   photo: string | null;
   tags: string[];
+  createdAt: string | null;
+  updatedAt: string | null;
 }

@@ -1,31 +1,15 @@
 import { Router } from 'express';
 import { nanoid } from 'nanoid';
 import {
-  chartFilePath,
   readIndex,
-  writeIndex,
-  readJson,
-  writeJsonAtomic,
+  loadChart,
+  saveChart,
+  deleteChartFile,
+  garbageCollectPhotos,
 } from '../lib/dataStore';
-import type { Chart, ChartIndexEntry, Person } from '../types';
-import fs from 'fs';
+import type { Chart, Person } from '../types';
 
 const router = Router();
-
-type StoredPerson = Omit<Person, 'sponsorIds'> & {
-  sponsorIds?: string[];
-  sponsorId?: string | null;
-  edgeColor?: string | null;
-  backgroundColor?: string | null;
-  colorLabel?: string;
-};
-
-const HEX_COLOR = /^#[0-9a-f]{6}$/i;
-const LEGACY_DEFAULT_BACKGROUND = '#1a1d24';
-
-function parseColor(value: unknown): string | null {
-  return typeof value === 'string' && HEX_COLOR.test(value) ? value : null;
-}
 
 function slugify(name: string): string {
   const base = name
@@ -36,48 +20,15 @@ function slugify(name: string): string {
   return base || 'chart';
 }
 
-function loadChart(id: string): Chart | null {
-  const filePath = chartFilePath(id);
-  if (!fs.existsSync(filePath)) return null;
-  const chart = readJson<Omit<Chart, 'people'> & { people: StoredPerson[] }>(filePath, {
-    id,
-    partnerName: id,
-    people: [],
-  });
-  return {
-    ...chart,
-    people: chart.people.map(({ sponsorId, ...person }) => ({
-      ...person,
-      sponsorIds: Array.isArray(person.sponsorIds) ? person.sponsorIds : sponsorId ? [sponsorId] : [],
-      edgeColor: parseColor(person.edgeColor),
-      backgroundColor: person.backgroundColor?.toLocaleLowerCase() === LEGACY_DEFAULT_BACKGROUND
-        ? null
-        : parseColor(person.backgroundColor),
-      colorLabel: typeof person.colorLabel === 'string' ? person.colorLabel : '',
-    })),
-  };
-}
-
-function saveChart(chart: Chart): void {
-  writeJsonAtomic(chartFilePath(chart.id), chart);
-  const index = readIndex();
-  const entry: ChartIndexEntry = {
-    id: chart.id,
-    partnerName: chart.partnerName,
-    personCount: chart.people.length,
-    lastUpdated: new Date().toISOString(),
-  };
-  const existingIdx = index.findIndex((e) => e.id === chart.id);
-  if (existingIdx >= 0) index[existingIdx] = entry;
-  else index.push(entry);
-  writeIndex(index);
-}
-
 /** Returns true if `candidateId` is `personId` itself or a descendant of it (would create a cycle). */
 function isSelfOrDescendant(people: Person[], personId: string, candidateId: string): boolean {
   if (personId === candidateId) return true;
   const children = people.filter((p) => p.managerId === personId);
   return children.some((c) => isSelfOrDescendant(people, c.id, candidateId));
+}
+
+function parseColorField(value: unknown): string | null {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : null;
 }
 
 // GET /api/charts - index of all charts
@@ -88,7 +39,7 @@ router.get('/', (_req, res) => {
 // POST /api/charts - create a new (empty) chart
 router.post('/', (req, res) => {
   const { partnerName } = req.body ?? {};
-  if (!partnerName || typeof partnerName !== 'string') {
+  if (!partnerName || typeof partnerName !== 'string' || !partnerName.trim()) {
     return res.status(400).json({ error: 'partnerName is required' });
   }
   let id = slugify(partnerName);
@@ -96,7 +47,7 @@ router.post('/', (req, res) => {
   if (index.some((e) => e.id === id)) {
     id = `${id}-${nanoid(5).toLowerCase()}`;
   }
-  const chart: Chart = { id, partnerName, people: [] };
+  const chart: Chart = { id, partnerName: partnerName.trim(), people: [] };
   saveChart(chart);
   res.status(201).json(chart);
 });
@@ -122,12 +73,35 @@ router.patch('/:id', (req, res) => {
 
 // DELETE /api/charts/:id
 router.delete('/:id', (req, res) => {
-  const filePath = chartFilePath(req.params.id);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Chart not found' });
-  fs.rmSync(filePath);
-  const index = readIndex().filter((e) => e.id !== req.params.id);
-  writeIndex(index);
+  const found = deleteChartFile(req.params.id);
+  if (!found) return res.status(404).json({ error: 'Chart not found' });
+  garbageCollectPhotos();
   res.status(204).end();
+});
+
+// PATCH /api/charts/:id/positions - batch-update multiple people's saved canvas positions in one write
+router.patch('/:id/positions', (req, res) => {
+  const chart = loadChart(req.params.id);
+  if (!chart) return res.status(404).json({ error: 'Chart not found' });
+  const { positions } = req.body ?? {};
+  if (!positions || typeof positions !== 'object') {
+    return res.status(400).json({ error: 'positions must be an object of personId -> {x, y}' });
+  }
+  const now = new Date().toISOString();
+  for (const person of chart.people) {
+    const pos = (positions as Record<string, unknown>)[person.id];
+    if (
+      pos &&
+      typeof pos === 'object' &&
+      typeof (pos as { x?: unknown }).x === 'number' &&
+      typeof (pos as { y?: unknown }).y === 'number'
+    ) {
+      person.position = { x: (pos as { x: number }).x, y: (pos as { y: number }).y };
+      person.updatedAt = now;
+    }
+  }
+  saveChart(chart);
+  res.json(chart);
 });
 
 // POST /api/charts/:id/people - add a person
@@ -136,26 +110,29 @@ router.post('/:id/people', (req, res) => {
   if (!chart) return res.status(404).json({ error: 'Chart not found' });
 
   const { name, title, department, photo, managerId, sponsorIds, tags, edgeColor, backgroundColor, colorLabel } = req.body ?? {};
-  if (!name || typeof name !== 'string') {
+  if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'name is required' });
   }
   if (managerId && !chart.people.some((p) => p.id === managerId)) {
     return res.status(400).json({ error: 'managerId does not exist in this chart' });
   }
 
+  const now = new Date().toISOString();
   const person: Person = {
     id: nanoid(10),
-    name,
+    name: name.trim(),
     title: title ?? '',
     department: department ?? '',
     photo: photo ?? null,
     managerId: managerId ?? null,
     sponsorIds: Array.isArray(sponsorIds) ? sponsorIds.filter((id): id is string => typeof id === 'string') : [],
     tags: Array.isArray(tags) ? tags : [],
-    edgeColor: parseColor(edgeColor),
-    backgroundColor: parseColor(backgroundColor),
+    edgeColor: parseColorField(edgeColor),
+    backgroundColor: parseColorField(backgroundColor),
     colorLabel: typeof colorLabel === 'string' ? colorLabel.trim() : '',
     position: null,
+    createdAt: now,
+    updatedAt: now,
   };
   chart.people.push(person);
   saveChart(chart);
@@ -190,10 +167,11 @@ router.put('/:id/people/:personId', (req, res) => {
     person.sponsorIds = sponsorIds.filter((id): id is string => typeof id === 'string');
   }
   if (tags !== undefined) person.tags = Array.isArray(tags) ? tags : person.tags;
-  if (edgeColor !== undefined) person.edgeColor = parseColor(edgeColor);
-  if (backgroundColor !== undefined) person.backgroundColor = parseColor(backgroundColor);
+  if (edgeColor !== undefined) person.edgeColor = parseColorField(edgeColor);
+  if (backgroundColor !== undefined) person.backgroundColor = parseColorField(backgroundColor);
   if (colorLabel !== undefined && typeof colorLabel === 'string') person.colorLabel = colorLabel.trim();
   if (position !== undefined) person.position = position;
+  person.updatedAt = new Date().toISOString();
 
   saveChart(chart);
   res.json(person);
@@ -207,11 +185,16 @@ router.delete('/:id/people/:personId', (req, res) => {
   if (!person) return res.status(404).json({ error: 'Person not found' });
 
   // Reparent direct subordinates to the deleted person's manager (or make them roots).
+  const now = new Date().toISOString();
   chart.people.forEach((p) => {
-    if (p.managerId === person.id) p.managerId = person.managerId;
+    if (p.managerId === person.id) {
+      p.managerId = person.managerId;
+      p.updatedAt = now;
+    }
   });
   chart.people = chart.people.filter((p) => p.id !== person.id);
   saveChart(chart);
+  garbageCollectPhotos();
   res.status(204).end();
 });
 

@@ -39,6 +39,11 @@ export const api = {
     }),
   deletePerson: (chartId: string, personId: string) =>
     request<void>(`/api/charts/${chartId}/people/${personId}`, { method: 'DELETE' }),
+  updatePositions: (chartId: string, positions: Record<string, { x: number; y: number }>) =>
+    request<Chart>(`/api/charts/${chartId}/positions`, {
+      method: 'PATCH',
+      body: JSON.stringify({ positions }),
+    }),
 
   // Sponsors
   listSponsors: () => request<Sponsor[]>('/api/sponsors'),
@@ -60,6 +65,24 @@ export const api = {
     return res.json();
   },
 
+  // Backup / restore
+  exportBackup: async (): Promise<Blob> => {
+    const res = await fetch('/api/backup');
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error ?? 'Could not create a backup.');
+    }
+    return res.blob();
+  },
+  restoreBackup: async (file: File): Promise<void> => {
+    const form = new FormData();
+    form.append('backup', file);
+    const res = await fetch('/api/backup/restore', { method: 'POST', body: form });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error ?? 'Restore failed.');
+    }
+  },
 };
 
 export function photoUrl(filename: string | null): string | null {

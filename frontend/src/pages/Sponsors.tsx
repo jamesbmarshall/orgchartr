@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useSponsorStore } from '../store/sponsorStore';
+import { useUndoStore } from '../store/undoStore';
 import { SponsorModal } from '../components/SponsorModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { photoUrl } from '../api/client';
@@ -8,9 +9,11 @@ import type { Sponsor } from '../types';
 
 export function Sponsors() {
   const { sponsors, loading, error, load, addSponsor, updateSponsor, deleteSponsor } = useSponsorStore();
+  const { scheduleDelete } = useUndoStore();
   const [editing, setEditing] = useState<Sponsor | 'new' | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Sponsor | null>(null);
   const [search, setSearch] = useState('');
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     load();
@@ -18,14 +21,33 @@ export function Sponsors() {
 
   const filteredSponsors = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return sponsors;
-    return sponsors.filter(
-      (sponsor) =>
-        sponsor.name.toLowerCase().includes(query) ||
-        sponsor.title.toLowerCase().includes(query) ||
-        sponsor.department.toLowerCase().includes(query),
+    return sponsors
+      .filter((sponsor) => !hiddenIds.has(sponsor.id))
+      .filter(
+        (sponsor) =>
+          !query ||
+          sponsor.name.toLowerCase().includes(query) ||
+          sponsor.title.toLowerCase().includes(query) ||
+          sponsor.department.toLowerCase().includes(query),
+      );
+  }, [sponsors, search, hiddenIds]);
+
+  function handleConfirmDelete() {
+    const sponsor = pendingDelete;
+    if (!sponsor) return;
+    setPendingDelete(null);
+    setHiddenIds((current) => new Set(current).add(sponsor.id));
+    scheduleDelete(
+      `${sponsor.name} removed from sponsors.`,
+      () => deleteSponsor(sponsor.id),
+      () =>
+        setHiddenIds((current) => {
+          const next = new Set(current);
+          next.delete(sponsor.id);
+          return next;
+        }),
     );
-  }, [sponsors, search]);
+  }
 
   return (
     <div className="page">
@@ -85,7 +107,9 @@ export function Sponsors() {
           );
         })}
         {!loading && sponsors.length === 0 && <p>No sponsors yet - add one above.</p>}
-        {!loading && sponsors.length > 0 && filteredSponsors.length === 0 && <p>No sponsors match "{search}".</p>}
+        {!loading && filteredSponsors.length === 0 && sponsors.length > 0 && search && (
+          <p>No sponsors match "{search}".</p>
+        )}
       </div>
 
       {editing && (
@@ -103,13 +127,10 @@ export function Sponsors() {
       {pendingDelete && (
         <ConfirmDialog
           title="Delete sponsor"
-          message={`Remove ${pendingDelete.name} from the sponsor directory? Any people currently linked to this sponsor will lose that link.`}
+          message={`Remove ${pendingDelete.name} from the sponsor directory? Any people currently linked to this sponsor will lose that link. You'll have a few seconds to undo.`}
           confirmLabel="Delete"
           danger
-          onConfirm={async () => {
-            await deleteSponsor(pendingDelete.id);
-            setPendingDelete(null);
-          }}
+          onConfirm={handleConfirmDelete}
           onCancel={() => setPendingDelete(null)}
         />
       )}

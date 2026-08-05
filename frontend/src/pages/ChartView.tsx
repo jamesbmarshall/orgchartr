@@ -19,7 +19,9 @@ import { computeAutoLayout } from '../layout/autoLayout';
 import { PersonNode, type PersonNodeData } from '../components/PersonNode';
 import { PersonModal } from '../components/PersonModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useUndoStore } from '../store/undoStore';
 import { ExportModal } from '../components/ExportModal';
+import { ImportModal } from '../components/ImportModal';
 import type { Person } from '../types';
 import { colorLegendEntries } from '../utils/personColors';
 import { comparePeopleBySurname } from '../utils/personNames';
@@ -58,14 +60,18 @@ export function ChartView() {
     addPerson,
     updatePerson,
     deletePerson,
+    updatePositions,
   } = useChartStore();
   const { sponsors, load: loadSponsors, addSponsor } = useSponsorStore();
+  const { scheduleDelete } = useUndoStore();
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<PersonNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [editingPerson, setEditingPerson] = useState<Person | 'new' | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Person | null>(null);
+  const [hiddenPersonIds, setHiddenPersonIds] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   // Search/filter/collapsed state is initialised from this chart's last saved view (if any).
@@ -80,6 +86,12 @@ export function ChartView() {
     () => new Set(loadChartViewState(chartId)?.collapsedIds ?? []),
   );
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [resettingLayout, setResettingLayout] = useState(false);
+  const [resetLayoutError, setResetLayoutError] = useState<string | null>(null);
+  // Bumped after a bulk "reset layout" to force the canvas to remount: replacing every node's
+  // position at once can leave @xyflow/react's internal measurement state stuck (nodes rendered
+  // with visibility:hidden forever). Remounting is the reliable way to recover from that.
+  const [layoutVersion, setLayoutVersion] = useState(0);
 
   useEffect(() => {
     if (chartId) loadChart(chartId);
@@ -115,6 +127,7 @@ export function ChartView() {
     const query = search.trim().toLowerCase();
     return (activeChart?.people ?? []).filter(
       (person) =>
+        !hiddenPersonIds.has(person.id) &&
         (!sponsorFilter || person.sponsorIds.includes(sponsorFilter)) &&
         (!managerFilter || person.managerId === managerFilter) &&
         (!tagFilter || person.tags.includes(tagFilter)) &&
@@ -123,7 +136,7 @@ export function ChartView() {
           person.title.toLowerCase().includes(query) ||
           person.department.toLowerCase().includes(query)),
     );
-  }, [activeChart, managerFilter, search, sponsorFilter, tagFilter]);
+  }, [activeChart, managerFilter, search, sponsorFilter, tagFilter, hiddenPersonIds]);
   const hiddenDescendantIds = useMemo(() => {
     const hidden = new Set<string>();
     for (const personId of collapsedIds) {
@@ -194,13 +207,17 @@ export function ChartView() {
 
   async function handleResetLayout() {
     if (!activeChart) return;
-    const positions = computeAutoLayout(activeChart.people, true);
-    await Promise.all(
-      activeChart.people.map((person) => {
-        const pos = positions.get(person.id);
-        return pos ? updatePerson(person.id, { position: pos }) : Promise.resolve();
-      }),
-    );
+    setResettingLayout(true);
+    setResetLayoutError(null);
+    try {
+      const positions = computeAutoLayout(activeChart.people, true);
+      await updatePositions(Object.fromEntries(positions));
+      setLayoutVersion((version) => version + 1);
+    } catch (err) {
+      setResetLayoutError(err instanceof Error ? err.message : 'Could not reset the layout. Please try again.');
+    } finally {
+      setResettingLayout(false);
+    }
   }
 
   function startRename() {
@@ -274,11 +291,15 @@ export function ChartView() {
           <button type="button" onClick={() => setExporting(true)}>
             Export
           </button>
-          <button type="button" onClick={handleResetLayout}>
-            Reset layout
+          <button type="button" onClick={() => setImporting(true)}>
+            Import
+          </button>
+          <button type="button" onClick={handleResetLayout} disabled={resettingLayout}>
+            {resettingLayout ? 'Resetting…' : 'Reset layout'}
           </button>
         </div>
       </div>
+      {resetLayoutError && <p className="error-text">{resetLayoutError}</p>}
 
       {showFilters && <div id="chart-filters" className="chart-filters" aria-label="Chart filters">
         <label>
@@ -336,7 +357,7 @@ export function ChartView() {
         </button>
       </div>}
 
-      <div className="chart-canvas">
+      <div className="chart-canvas" key={layoutVersion}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -398,6 +419,17 @@ export function ChartView() {
         />
       )}
 
+      {importing && (
+        <ImportModal
+          people={activeChart.people}
+          sponsors={sponsors}
+          onAddPerson={addPerson}
+          onUpdatePerson={updatePerson}
+          onCreateSponsor={(name) => addSponsor({ name })}
+          onClose={() => setImporting(false)}
+        />
+      )}
+
       {editingPerson && (
         <PersonModal
           people={activeChart.people}
@@ -418,12 +450,23 @@ export function ChartView() {
           title="Remove person"
           message={`Remove ${pendingDelete.name} from the chart? Their direct reports will be reparented to ${
             activeChart.people.find((p) => p.id === pendingDelete.managerId)?.name ?? 'the top of the chart'
-          }.`}
+          }. You'll have a few seconds to undo.`}
           confirmLabel="Remove"
           danger
-          onConfirm={async () => {
-            await deletePerson(pendingDelete.id);
+          onConfirm={() => {
+            const person = pendingDelete;
             setPendingDelete(null);
+            setHiddenPersonIds((current) => new Set(current).add(person.id));
+            scheduleDelete(
+              `${person.name} removed from the chart.`,
+              () => deletePerson(person.id),
+              () =>
+                setHiddenPersonIds((current) => {
+                  const next = new Set(current);
+                  next.delete(person.id);
+                  return next;
+                }),
+            );
           }}
           onCancel={() => setPendingDelete(null)}
         />

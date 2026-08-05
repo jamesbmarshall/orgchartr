@@ -1,16 +1,26 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useChartStore } from '../store/chartStore';
+import { useUndoStore } from '../store/undoStore';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { api } from '../api/client';
 
 export function Dashboard() {
   const { index, indexLoading, indexError, loadIndex, createChart, deleteChart } = useChartStore();
+  const { scheduleDelete } = useUndoStore();
   const navigate = useNavigate();
   const [newPartnerName, setNewPartnerName] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+
+  const [exportingBackup, setExportingBackup] = useState(false);
+  const [backupError, setBackupError] = useState<string | null>(null);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadIndex();
@@ -18,9 +28,10 @@ export function Dashboard() {
 
   const filteredIndex = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return index;
-    return index.filter((entry) => entry.partnerName.toLowerCase().includes(query));
-  }, [index, search]);
+    return index
+      .filter((entry) => !hiddenIds.has(entry.id))
+      .filter((entry) => !query || entry.partnerName.toLowerCase().includes(query));
+  }, [index, search, hiddenIds]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -35,6 +46,58 @@ export function Dashboard() {
       setCreateError(err instanceof Error ? err.message : 'Could not create the chart. Please try again.');
     } finally {
       setCreating(false);
+    }
+  }
+
+  function handleConfirmDelete() {
+    const id = pendingDelete;
+    if (!id) return;
+    const name = index.find((entry) => entry.id === id)?.partnerName ?? 'Chart';
+    setPendingDelete(null);
+    setHiddenIds((current) => new Set(current).add(id));
+    scheduleDelete(
+      `"${name}" deleted.`,
+      () => deleteChart(id),
+      () =>
+        setHiddenIds((current) => {
+          const next = new Set(current);
+          next.delete(id);
+          return next;
+        }),
+    );
+  }
+
+  async function handleExportBackup() {
+    setExportingBackup(true);
+    setBackupError(null);
+    try {
+      const blob = await api.exportBackup();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `orgchartr-backup-${new Date().toISOString().slice(0, 10)}.zip`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setBackupError(err instanceof Error ? err.message : 'Could not create a backup. Please try again.');
+    } finally {
+      setExportingBackup(false);
+    }
+  }
+
+  async function handleConfirmRestore() {
+    if (!restoreFile) return;
+    setRestoring(true);
+    setBackupError(null);
+    try {
+      await api.restoreBackup(restoreFile);
+      setRestoreFile(null);
+      // The restore replaces all charts, people, sponsors, and photos wholesale;
+      // reload the whole app so every store re-fetches from the new data.
+      window.location.reload();
+    } catch (err) {
+      setBackupError(err instanceof Error ? err.message : 'Restore failed. Please try again.');
+      setRestoring(false);
     }
   }
 
@@ -89,24 +152,57 @@ export function Dashboard() {
           </div>
         ))}
         {!indexLoading && index.length === 0 && <p>No org charts yet - create one above to get started.</p>}
-        {!indexLoading && index.length > 0 && filteredIndex.length === 0 && <p>No charts match "{search}".</p>}
+        {!indexLoading && filteredIndex.length === 0 && index.length > 0 && search && (
+          <p>No charts match "{search}".</p>
+        )}
       </div>
+
+      <div className="backup-section">
+        <span className="backup-section__label">Backup &amp; restore all data</span>
+        <button type="button" onClick={handleExportBackup} disabled={exportingBackup}>
+          {exportingBackup ? 'Preparing…' : 'Export backup'}
+        </button>
+        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={restoring}>
+          Restore from backup…
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".zip"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) setRestoreFile(file);
+            e.target.value = '';
+          }}
+        />
+      </div>
+      {backupError && <p className="error-text">{backupError}</p>}
 
       {pendingDelete && (
         <ConfirmDialog
           title="Delete chart"
-          message={`Permanently delete "${
+          message={`Delete "${
             index.find((entry) => entry.id === pendingDelete)?.partnerName ?? 'this chart'
-          }" and all its people? This cannot be undone unless your storage provider has a recoverable backup.`}
+          }" and all its people? You'll have a few seconds to undo.`}
           confirmLabel="Delete"
           danger
-          onConfirm={async () => {
-            await deleteChart(pendingDelete);
-            setPendingDelete(null);
-          }}
+          onConfirm={handleConfirmDelete}
           onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
+      {restoreFile && (
+        <ConfirmDialog
+          title="Restore from backup"
+          message={`This will permanently replace ALL current charts, people, sponsors, and photos with the contents of "${restoreFile.name}". This cannot be undone. Continue?`}
+          confirmLabel={restoring ? 'Restoring…' : 'Restore'}
+          danger
+          onConfirm={handleConfirmRestore}
+          onCancel={() => setRestoreFile(null)}
         />
       )}
     </div>
   );
 }
+
