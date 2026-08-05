@@ -11,7 +11,7 @@ import {
   type Edge,
   type OnNodeDrag,
 } from '@xyflow/react';
-import { Filter, X } from 'lucide-react';
+import { Filter, Search, X } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
 import { useChartStore } from '../store/chartStore';
 import { useSponsorStore } from '../store/sponsorStore';
@@ -26,6 +26,25 @@ import { comparePeopleBySurname } from '../utils/personNames';
 import { getDescendantIds } from '../utils/orgTree';
 
 const nodeTypes = { person: PersonNode };
+
+interface ChartViewState {
+  search?: string;
+  sponsorFilter?: string;
+  managerFilter?: string;
+  tagFilter?: string;
+  showFilters?: boolean;
+  collapsedIds?: string[];
+}
+
+function loadChartViewState(chartId: string | undefined): ChartViewState | null {
+  if (!chartId) return null;
+  try {
+    const raw = localStorage.getItem(`orgchartr:chartView:${chartId}`);
+    return raw ? (JSON.parse(raw) as ChartViewState) : null;
+  } catch {
+    return null;
+  }
+}
 
 export function ChartView() {
   const { chartId } = useParams<{ chartId: string }>();
@@ -49,17 +68,35 @@ export function ChartView() {
   const [exporting, setExporting] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-  const [sponsorFilter, setSponsorFilter] = useState('');
-  const [managerFilter, setManagerFilter] = useState('');
-  const [tagFilter, setTagFilter] = useState('');
-  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+  // Search/filter/collapsed state is initialised from this chart's last saved view (if any).
+  // Since navigating to a different chart always remounts this component (via the Dashboard route),
+  // a lazy initial state is sufficient here and avoids restore/persist effects racing each other.
+  const [showFilters, setShowFilters] = useState(() => loadChartViewState(chartId)?.showFilters ?? false);
+  const [search, setSearch] = useState(() => loadChartViewState(chartId)?.search ?? '');
+  const [sponsorFilter, setSponsorFilter] = useState(() => loadChartViewState(chartId)?.sponsorFilter ?? '');
+  const [managerFilter, setManagerFilter] = useState(() => loadChartViewState(chartId)?.managerFilter ?? '');
+  const [tagFilter, setTagFilter] = useState(() => loadChartViewState(chartId)?.tagFilter ?? '');
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(
+    () => new Set(loadChartViewState(chartId)?.collapsedIds ?? []),
+  );
+  const [renameError, setRenameError] = useState<string | null>(null);
 
   useEffect(() => {
     if (chartId) loadChart(chartId);
     loadSponsors();
     return () => clearActiveChart();
   }, [chartId, loadChart, clearActiveChart, loadSponsors]);
+
+  // Persist this chart's search/filter/collapsed state as it changes.
+  useEffect(() => {
+    if (!chartId) return;
+    const state = { search, sponsorFilter, managerFilter, tagFilter, showFilters, collapsedIds: [...collapsedIds] };
+    try {
+      localStorage.setItem(`orgchartr:chartView:${chartId}`, JSON.stringify(state));
+    } catch {
+      // Ignore storage failures (e.g. private browsing quota); state simply won't persist.
+    }
+  }, [chartId, search, sponsorFilter, managerFilter, tagFilter, showFilters, collapsedIds]);
 
   const sponsorById = useMemo(() => new Map(sponsors.map((s) => [s.id, s])), [sponsors]);
 
@@ -74,16 +111,19 @@ export function ChartView() {
     () => [...new Set((activeChart?.people ?? []).flatMap((person) => person.tags))].toSorted((a, b) => a.localeCompare(b)),
     [activeChart],
   );
-  const visiblePeople = useMemo(
-    () =>
-      (activeChart?.people ?? []).filter(
-        (person) =>
-          (!sponsorFilter || person.sponsorIds.includes(sponsorFilter)) &&
-          (!managerFilter || person.managerId === managerFilter) &&
-          (!tagFilter || person.tags.includes(tagFilter)),
-      ),
-    [activeChart, managerFilter, sponsorFilter, tagFilter],
-  );
+  const visiblePeople = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return (activeChart?.people ?? []).filter(
+      (person) =>
+        (!sponsorFilter || person.sponsorIds.includes(sponsorFilter)) &&
+        (!managerFilter || person.managerId === managerFilter) &&
+        (!tagFilter || person.tags.includes(tagFilter)) &&
+        (!query ||
+          person.name.toLowerCase().includes(query) ||
+          person.title.toLowerCase().includes(query) ||
+          person.department.toLowerCase().includes(query)),
+    );
+  }, [activeChart, managerFilter, search, sponsorFilter, tagFilter]);
   const hiddenDescendantIds = useMemo(() => {
     const hidden = new Set<string>();
     for (const personId of collapsedIds) {
@@ -97,6 +137,8 @@ export function ChartView() {
   );
   const filtersActive = Boolean(sponsorFilter || managerFilter || tagFilter);
   const activeFilterCount = [sponsorFilter, managerFilter, tagFilter].filter(Boolean).length;
+  const searchActive = Boolean(search.trim());
+  const anyFilterActive = filtersActive || searchActive;
   const legendEntries = useMemo(() => colorLegendEntries(displayedPeople), [displayedPeople]);
 
   const handleEdit = useCallback((person: Person) => setEditingPerson(person), []);
@@ -163,13 +205,20 @@ export function ChartView() {
 
   function startRename() {
     setNameDraft(activeChart?.partnerName ?? '');
+    setRenameError(null);
     setRenaming(true);
   }
 
   async function submitRename(e: React.FormEvent) {
     e.preventDefault();
-    if (chartId && nameDraft.trim()) await renameChart(chartId, nameDraft.trim());
-    setRenaming(false);
+    if (!chartId || !nameDraft.trim()) return;
+    setRenameError(null);
+    try {
+      await renameChart(chartId, nameDraft.trim());
+      setRenaming(false);
+    } catch (err) {
+      setRenameError(err instanceof Error ? err.message : 'Could not rename the chart. Please try again.');
+    }
   }
 
   if (activeChartLoading) return <div className="page">Loading chart…</div>;
@@ -189,12 +238,23 @@ export function ChartView() {
             <button type="button" onClick={() => setRenaming(false)}>
               Cancel
             </button>
+            {renameError && <span className="error-text">{renameError}</span>}
           </form>
         ) : (
           <h1 onClick={startRename} title="Click to rename">
             {activeChart.partnerName}
           </h1>
         )}
+        <div className="chart-toolbar__search">
+          <Search aria-hidden="true" />
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search people…"
+            aria-label="Search people by name, title, or department"
+          />
+        </div>
         <div className="chart-toolbar__actions">
           <button
             type="button"
@@ -262,13 +322,14 @@ export function ChartView() {
         <button
           type="button"
           className="chart-filters__clear"
-          disabled={!filtersActive}
+          disabled={!anyFilterActive}
           title="Clear filters"
           aria-label="Clear all filters"
           onClick={() => {
             setSponsorFilter('');
             setManagerFilter('');
             setTagFilter('');
+            setSearch('');
           }}
         >
           <X aria-hidden="true" />
@@ -310,7 +371,7 @@ export function ChartView() {
             </div>
           </aside>
         )}
-        {filtersActive && visiblePeople.length === 0 && (
+        {anyFilterActive && visiblePeople.length === 0 && (
           <div className="chart-canvas__empty">
             <strong>No people match these filters</strong>
             <button
@@ -319,6 +380,7 @@ export function ChartView() {
                 setSponsorFilter('');
                 setManagerFilter('');
                 setTagFilter('');
+                setSearch('');
               }}
             >
               Clear filters

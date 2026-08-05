@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useSponsorStore } from '../store/sponsorStore';
 import { SponsorModal } from '../components/SponsorModal';
@@ -10,10 +10,22 @@ export function Sponsors() {
   const { sponsors, loading, error, load, addSponsor, updateSponsor, deleteSponsor } = useSponsorStore();
   const [editing, setEditing] = useState<Sponsor | 'new' | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Sponsor | null>(null);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const filteredSponsors = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return sponsors;
+    return sponsors.filter(
+      (sponsor) =>
+        sponsor.name.toLowerCase().includes(query) ||
+        sponsor.title.toLowerCase().includes(query) ||
+        sponsor.department.toLowerCase().includes(query),
+    );
+  }, [sponsors, search]);
 
   return (
     <div className="page">
@@ -29,11 +41,22 @@ export function Sponsors() {
         Add sponsor
       </button>
 
+      {sponsors.length > 0 && (
+        <input
+          type="search"
+          className="search-input"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search sponsors by name, title, or department…"
+          aria-label="Search sponsors"
+        />
+      )}
+
       {loading && <p>Loading…</p>}
       {error && <p className="error-text">{error}</p>}
 
       <div className="chart-grid">
-        {sponsors.map((sponsor) => {
+        {filteredSponsors.map((sponsor) => {
           const photo = photoUrl(sponsor.photo);
           return (
             <div key={sponsor.id} className="sponsor-card">
@@ -62,6 +85,7 @@ export function Sponsors() {
           );
         })}
         {!loading && sponsors.length === 0 && <p>No sponsors yet - add one above.</p>}
+        {!loading && sponsors.length > 0 && filteredSponsors.length === 0 && <p>No sponsors match "{search}".</p>}
       </div>
 
       {editing && (

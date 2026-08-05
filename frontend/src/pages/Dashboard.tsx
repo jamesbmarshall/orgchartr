@@ -1,25 +1,38 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router';
 import { useChartStore } from '../store/chartStore';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 export function Dashboard() {
   const { index, indexLoading, indexError, loadIndex, createChart, deleteChart } = useChartStore();
+  const navigate = useNavigate();
   const [newPartnerName, setNewPartnerName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   useEffect(() => {
     loadIndex();
   }, [loadIndex]);
 
+  const filteredIndex = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return index;
+    return index.filter((entry) => entry.partnerName.toLowerCase().includes(query));
+  }, [index, search]);
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!newPartnerName.trim()) return;
     setCreating(true);
+    setCreateError(null);
     try {
-      await createChart(newPartnerName.trim());
+      const chart = await createChart(newPartnerName.trim());
       setNewPartnerName('');
+      navigate(`/chart/${chart.id}`);
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : 'Could not create the chart. Please try again.');
     } finally {
       setCreating(false);
     }
@@ -44,12 +57,24 @@ export function Dashboard() {
           {creating ? 'Creating…' : 'New chart'}
         </button>
       </form>
+      {createError && <p className="error-text">{createError}</p>}
+
+      {index.length > 0 && (
+        <input
+          type="search"
+          className="search-input"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search charts by partner name…"
+          aria-label="Search charts by partner name"
+        />
+      )}
 
       {indexLoading && <p>Loading…</p>}
       {indexError && <p className="error-text">{indexError}</p>}
 
       <div className="chart-grid">
-        {index.map((entry) => (
+        {filteredIndex.map((entry) => (
           <div key={entry.id} className="chart-card">
             <Link to={`/chart/${entry.id}`} className="chart-card__link">
               <h2>{entry.partnerName}</h2>
@@ -64,12 +89,15 @@ export function Dashboard() {
           </div>
         ))}
         {!indexLoading && index.length === 0 && <p>No org charts yet - create one above to get started.</p>}
+        {!indexLoading && index.length > 0 && filteredIndex.length === 0 && <p>No charts match "{search}".</p>}
       </div>
 
       {pendingDelete && (
         <ConfirmDialog
           title="Delete chart"
-          message="This permanently deletes the chart and all its people. This cannot be undone unless your storage provider has a recoverable backup."
+          message={`Permanently delete "${
+            index.find((entry) => entry.id === pendingDelete)?.partnerName ?? 'this chart'
+          }" and all its people? This cannot be undone unless your storage provider has a recoverable backup.`}
           confirmLabel="Delete"
           danger
           onConfirm={async () => {

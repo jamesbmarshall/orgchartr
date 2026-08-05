@@ -102,6 +102,13 @@ select {
   margin-bottom: 1.5rem;
 }
 
+.search-input {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  margin-bottom: 1rem;
+}
+
 .chart-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -167,6 +174,29 @@ select {
 .chart-toolbar__actions {
   display: flex;
   gap: 0.5rem;
+}
+
+.chart-toolbar__search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 160px;
+  max-width: 280px;
+}
+
+.chart-toolbar__search svg {
+  position: absolute;
+  left: 0.6rem;
+  width: 15px;
+  height: 15px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.chart-toolbar__search input {
+  width: 100%;
+  padding-left: 1.9rem;
 }
 
 .chart-toolbar__icon-button {
@@ -253,7 +283,15 @@ select {
 
 .rename-form {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 0.4rem;
+}
+
+.rename-form .error-text {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.8rem;
 }
 
 .chart-canvas {
