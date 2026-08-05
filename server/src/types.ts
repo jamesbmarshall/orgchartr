@@ -5,8 +5,11 @@ export interface Person {
   department: string;
   photo: string | null;
   managerId: string | null;
-  sponsorId: string | null;
+  sponsorIds: string[];
   tags: string[];
+  edgeColor: string | null;
+  backgroundColor: string | null;
+  colorLabel: string;
   position: { x: number; y: number } | null;
 }
 

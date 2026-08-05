@@ -1,6 +1,7 @@
 import type { Person, Sponsor } from '../types';
 import { computeAutoLayout, NODE_WIDTH, NODE_HEIGHT } from '../layout/autoLayout';
 import { photoUrl } from '../api/client';
+import { colorLegendEntries, readableTextColor } from './personColors';
 
 export type ExportFormat = 'svg' | 'png' | 'csv' | 'json';
 
@@ -14,6 +15,7 @@ export const EXPORT_FORMATS: { value: ExportFormat; label: string; hint: string 
 const PNG_SCALE = 2;
 const MARGIN = 40;
 const TITLE_HEIGHT = 56;
+const LEGEND_ROW_HEIGHT = 24;
 
 function escapeXml(value: string): string {
   return value
@@ -89,8 +91,11 @@ export async function buildSvg(people: Person[], { title, sponsorById }: SvgOpti
   const maxY = Math.max(...placed.map((n) => n.y + NODE_HEIGHT));
   const offsetX = MARGIN - minX;
   const offsetY = MARGIN + TITLE_HEIGHT - minY;
-  const width = maxX - minX + MARGIN * 2;
-  const height = maxY - minY + MARGIN * 2 + TITLE_HEIGHT;
+  const legendEntries = colorLegendEntries(people);
+  const legendHeight = legendEntries.length > 0 ? 34 + legendEntries.length * LEGEND_ROW_HEIGHT : 0;
+  const width = Math.max(maxX - minX + MARGIN * 2, 320);
+  const chartHeight = maxY - minY + MARGIN * 2 + TITLE_HEIGHT;
+  const height = chartHeight + legendHeight;
 
   const photos = await loadPhotos(people);
 
@@ -112,7 +117,13 @@ export async function buildSvg(people: Person[], { title, sponsorById }: SvgOpti
       const left = x + offsetX;
       const top = y + offsetY;
       const photo = photos.get(person.id);
-      const sponsor = person.sponsorId ? sponsorById.get(person.sponsorId) : undefined;
+      const backgroundColor = person.backgroundColor ?? '#ffffff';
+      const edgeColor = person.edgeColor ?? '#d5dae3';
+      const textColor = readableTextColor(backgroundColor);
+      const sponsorNames = person.sponsorIds.flatMap((id) => {
+        const sponsor = sponsorById.get(id);
+        return sponsor ? [sponsor.name] : [];
+      });
       const avatar = photo
         ? `<clipPath id="clip-${escapeXml(person.id)}"><circle cx="${left + 30}" cy="${top + 32}" r="18" /></clipPath>` +
           `<image href="${escapeXml(photo)}" x="${left + 12}" y="${top + 14}" width="36" height="36" ` +
@@ -123,41 +134,54 @@ export async function buildSvg(people: Person[], { title, sponsorById }: SvgOpti
           )}</text>`;
 
       const lines: string[] = [
-        `<text x="${left + 58}" y="${top + 28}" font-size="14" font-weight="600" fill="#1a1d24">${escapeXml(
+        `<text x="${left + 58}" y="${top + 28}" font-size="14" font-weight="600" fill="${textColor}">${escapeXml(
           truncate(person.name, 24),
         )}</text>`,
       ];
       if (person.title) {
         lines.push(
-          `<text x="${left + 58}" y="${top + 45}" font-size="11" fill="#5a6273">${escapeXml(truncate(person.title, 28))}</text>`,
+          `<text x="${left + 58}" y="${top + 45}" font-size="11" fill="${textColor}" opacity="0.72">${escapeXml(truncate(person.title, 28))}</text>`,
         );
       }
       if (person.department) {
         lines.push(
-          `<text x="${left + 58}" y="${top + 60}" font-size="11" fill="#5a6273">${escapeXml(
+          `<text x="${left + 58}" y="${top + 60}" font-size="11" fill="${textColor}" opacity="0.72">${escapeXml(
             truncate(person.department, 28),
           )}</text>`,
         );
       }
-      const footer = [sponsor ? `Sponsor: ${sponsor.name}` : null, person.tags.length ? person.tags.join(', ') : null]
+      const footer = [sponsorNames.length ? `Sponsors: ${sponsorNames.join(', ')}` : null, person.tags.length ? person.tags.join(', ') : null]
         .filter(Boolean)
         .join(' · ');
       if (footer) {
         lines.push(
-          `<text x="${left + 12}" y="${top + 92}" font-size="10" fill="#7a8394">${escapeXml(truncate(footer, 40))}</text>`,
+          `<text x="${left + 12}" y="${top + 92}" font-size="10" fill="${textColor}" opacity="0.68">${escapeXml(truncate(footer, 40))}</text>`,
         );
       }
 
       return (
         `<g>` +
         `<rect x="${left}" y="${top}" width="${NODE_WIDTH}" height="${NODE_HEIGHT}" rx="10" ` +
-        `fill="#ffffff" stroke="#d5dae3" stroke-width="1.5" />` +
+        `fill="${backgroundColor}" stroke="#d5dae3" stroke-width="1.5" />` +
+        `<path d="M ${left + 2} ${top + 10} V ${top + NODE_HEIGHT - 10}" stroke="${edgeColor}" stroke-width="4" stroke-linecap="round" />` +
         avatar +
         lines.join('') +
         `</g>`
       );
     })
     .join('\n    ');
+
+  const legend = legendEntries.length > 0
+    ? `<g transform="translate(${MARGIN} ${chartHeight - 8})">
+      <text x="0" y="0" font-size="13" font-weight="600" fill="#1a1d24">Colour key</text>
+      ${legendEntries.map((entry, index) => {
+        const rowY = 12 + index * LEGEND_ROW_HEIGHT;
+        return `<rect x="0" y="${rowY}" width="30" height="16" rx="4" fill="${entry.backgroundColor}" stroke="#d5dae3" stroke-width="1.5" />` +
+          `<path d="M 2 ${rowY + 4} V ${rowY + 12}" stroke="${entry.edgeColor}" stroke-width="4" stroke-linecap="round" />` +
+          `<text x="40" y="${rowY + 12}" font-size="11" fill="#3f4652">${escapeXml(entry.label)}</text>`;
+      }).join('')}
+    </g>`
+    : '';
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="Segoe UI, Helvetica, Arial, sans-serif">
@@ -169,6 +193,7 @@ export async function buildSvg(people: Person[], { title, sponsorById }: SvgOpti
   <g>
     ${nodes}
   </g>
+  ${legend}
 </svg>`;
 }
 
@@ -205,15 +230,21 @@ function csvCell(value: string): string {
 
 export function buildCsv(people: Person[], sponsorById: Map<string, Sponsor>): string {
   const nameById = new Map(people.map((p) => [p.id, p.name]));
-  const header = ['Name', 'Title', 'Department', 'Manager', 'Sponsor', 'Tags'];
+  const header = ['Name', 'Title', 'Department', 'Manager', 'Sponsors', 'Tags', 'Colour label', 'Edge colour', 'Background colour'];
   const rows = people.map((person) =>
     [
       person.name,
       person.title,
       person.department,
       (person.managerId && nameById.get(person.managerId)) || '',
-      (person.sponsorId && sponsorById.get(person.sponsorId)?.name) || '',
+      person.sponsorIds.flatMap((id) => {
+        const sponsor = sponsorById.get(id);
+        return sponsor ? [sponsor.name] : [];
+      }).join('; '),
       person.tags.join('; '),
+      person.colorLabel,
+      person.edgeColor ?? '',
+      person.backgroundColor ?? '',
     ]
       .map(csvCell)
       .join(','),

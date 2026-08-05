@@ -169,6 +169,88 @@ select {
   gap: 0.5rem;
 }
 
+.chart-toolbar__icon-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+}
+
+.chart-toolbar__icon-button svg {
+  width: 17px;
+  height: 17px;
+}
+
+.chart-toolbar__icon-button--active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.chart-toolbar__filter-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.chart-filters {
+  display: flex;
+  align-items: end;
+  gap: 0.75rem;
+  padding: 0.65rem 1.25rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.chart-filters__clear svg {
+  width: 16px;
+  height: 16px;
+}
+
+.chart-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.chart-filters select {
+  min-width: 150px;
+  color: var(--text);
+}
+
+.chart-filters__count {
+  align-self: center;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.chart-filters__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: end;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+}
+
 .rename-form {
   display: flex;
   gap: 0.4rem;
@@ -176,15 +258,28 @@ select {
 
 .chart-canvas {
   flex: 1;
+  position: relative;
+}
+
+.chart-canvas__empty {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-muted);
 }
 
 .person-node {
-  background: var(--surface);
+  background: var(--person-background, var(--surface));
   border: 1px solid var(--border);
+  border-left: 4px solid var(--person-edge, var(--border));
   border-radius: 10px;
   padding: 0.75rem;
   width: 220px;
-  color: var(--text);
+  color: var(--person-text, var(--text));
 }
 
 .person-node__header {
@@ -224,7 +319,7 @@ select {
 .person-node__title,
 .person-node__department {
   font-size: 0.78rem;
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--person-text, var(--text)) 70%, transparent);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -275,6 +370,43 @@ select {
   height: 14px;
 }
 
+.chart-legend {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 5;
+  min-width: 150px;
+  max-width: min(280px, calc(100% - 2rem));
+  padding: 0.65rem 0.75rem;
+  background: rgba(26, 29, 36, 0.94);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  font-size: 0.76rem;
+  pointer-events: none;
+}
+
+.chart-legend__entries {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+
+.chart-legend__entry {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chart-legend__swatch {
+  width: 28px;
+  height: 17px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  border-radius: 4px;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -302,6 +434,58 @@ select {
   margin-bottom: 0.9rem;
   font-size: 0.85rem;
   color: var(--text-muted);
+}
+
+.person-colors {
+  margin: 0 0 0.9rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.person-colors legend {
+  padding: 0 0.3rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.modal form .person-colors__toggle {
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 0;
+  color: var(--text);
+}
+
+.person-colors__fields {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.65rem;
+  align-items: end;
+  margin-top: 0.75rem;
+}
+
+.person-colors__scheme {
+  grid-column: 1 / -1;
+}
+
+.modal form .person-colors__fields label {
+  margin-bottom: 0;
+}
+
+.person-colors input[type='color'] {
+  width: 48px;
+  height: 34px;
+  padding: 3px;
+}
+
+.person-colors__preview {
+  grid-column: 1 / -1;
+  min-height: 34px;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.78rem;
 }
 
 .modal form input,

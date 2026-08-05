@@ -11,6 +11,7 @@ import {
   type Edge,
   type OnNodeDrag,
 } from '@xyflow/react';
+import { Filter, X } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
 import { useChartStore } from '../store/chartStore';
 import { useSponsorStore } from '../store/sponsorStore';
@@ -20,6 +21,7 @@ import { PersonModal } from '../components/PersonModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ExportModal } from '../components/ExportModal';
 import type { Person } from '../types';
+import { colorLegendEntries } from '../utils/personColors';
 
 const nodeTypes = { person: PersonNode };
 
@@ -45,6 +47,10 @@ export function ChartView() {
   const [exporting, setExporting] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [sponsorFilter, setSponsorFilter] = useState('');
+  const [managerFilter, setManagerFilter] = useState('');
+  const [tagFilter, setTagFilter] = useState('');
 
   useEffect(() => {
     if (chartId) loadChart(chartId);
@@ -53,6 +59,31 @@ export function ChartView() {
   }, [chartId, loadChart, clearActiveChart, loadSponsors]);
 
   const sponsorById = useMemo(() => new Map(sponsors.map((s) => [s.id, s])), [sponsors]);
+
+  const managerOptions = useMemo(
+    () =>
+      (activeChart?.people ?? [])
+        .filter((person) => activeChart?.people.some((report) => report.managerId === person.id))
+        .toSorted((a, b) => a.name.localeCompare(b.name)),
+    [activeChart],
+  );
+  const tagOptions = useMemo(
+    () => [...new Set((activeChart?.people ?? []).flatMap((person) => person.tags))].toSorted((a, b) => a.localeCompare(b)),
+    [activeChart],
+  );
+  const visiblePeople = useMemo(
+    () =>
+      (activeChart?.people ?? []).filter(
+        (person) =>
+          (!sponsorFilter || person.sponsorIds.includes(sponsorFilter)) &&
+          (!managerFilter || person.managerId === managerFilter) &&
+          (!tagFilter || person.tags.includes(tagFilter)),
+      ),
+    [activeChart, managerFilter, sponsorFilter, tagFilter],
+  );
+  const filtersActive = Boolean(sponsorFilter || managerFilter || tagFilter);
+  const activeFilterCount = [sponsorFilter, managerFilter, tagFilter].filter(Boolean).length;
+  const legendEntries = useMemo(() => colorLegendEntries(visiblePeople), [visiblePeople]);
 
   const handleEdit = useCallback((person: Person) => setEditingPerson(person), []);
   const handleDelete = useCallback((person: Person) => setPendingDelete(person), []);
@@ -64,19 +95,28 @@ export function ChartView() {
       return;
     }
     const autoPositions = computeAutoLayout(activeChart.people, false);
-    const newNodes: Node<PersonNodeData>[] = activeChart.people.map((person) => ({
+    const visibleIds = new Set(visiblePeople.map((person) => person.id));
+    const newNodes: Node<PersonNodeData>[] = visiblePeople.map((person) => ({
       id: person.id,
       type: 'person',
       position: person.position ?? autoPositions.get(person.id) ?? { x: 0, y: 0 },
-      data: { person, sponsor: person.sponsorId ? sponsorById.get(person.sponsorId) : undefined, onEdit: handleEdit, onDelete: handleDelete },
+      data: {
+        person,
+        sponsors: person.sponsorIds.flatMap((id) => {
+          const sponsor = sponsorById.get(id);
+          return sponsor ? [sponsor] : [];
+        }),
+        onEdit: handleEdit,
+        onDelete: handleDelete,
+      },
     }));
-    const newEdges: Edge[] = activeChart.people
-      .filter((p) => p.managerId)
+    const newEdges: Edge[] = visiblePeople
+      .filter((person) => person.managerId && visibleIds.has(person.managerId))
       .map((p) => ({ id: `${p.managerId}-${p.id}`, source: p.managerId as string, target: p.id }));
     setNodes(newNodes);
     setEdges(newEdges);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeChart, sponsorById, handleEdit, handleDelete]);
+  }, [activeChart, visiblePeople, sponsorById, handleEdit, handleDelete]);
 
   const onNodeDragStop: OnNodeDrag<Node<PersonNodeData>> = useCallback(
     (_event, node) => {
@@ -131,6 +171,18 @@ export function ChartView() {
           </h1>
         )}
         <div className="chart-toolbar__actions">
+          <button
+            type="button"
+            className={`chart-toolbar__icon-button${filtersActive ? ' chart-toolbar__icon-button--active' : ''}`}
+            title={showFilters ? 'Hide filters' : 'Show filters'}
+            aria-label={showFilters ? 'Hide chart filters' : 'Show chart filters'}
+            aria-expanded={showFilters}
+            aria-controls="chart-filters"
+            onClick={() => setShowFilters((visible) => !visible)}
+          >
+            <Filter aria-hidden="true" />
+            {activeFilterCount > 0 && <span className="chart-toolbar__filter-count">{activeFilterCount}</span>}
+          </button>
           <button type="button" className="primary" onClick={() => setEditingPerson('new')}>
             Add person
           </button>
@@ -142,6 +194,61 @@ export function ChartView() {
           </button>
         </div>
       </div>
+
+      {showFilters && <div id="chart-filters" className="chart-filters" aria-label="Chart filters">
+        <label>
+          <span>Sponsor</span>
+          <select value={sponsorFilter} onChange={(event) => setSponsorFilter(event.target.value)}>
+            <option value="">All sponsors</option>
+            {sponsors
+              .toSorted((a, b) => a.name.localeCompare(b.name))
+              .map((sponsor) => (
+                <option key={sponsor.id} value={sponsor.id}>
+                  {sponsor.name}
+                </option>
+              ))}
+          </select>
+        </label>
+        <label>
+          <span>Manager</span>
+          <select value={managerFilter} onChange={(event) => setManagerFilter(event.target.value)}>
+            <option value="">All managers</option>
+            {managerOptions.map((manager) => (
+              <option key={manager.id} value={manager.id}>
+                {manager.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Tag</span>
+          <select value={tagFilter} onChange={(event) => setTagFilter(event.target.value)}>
+            <option value="">All tags</option>
+            {tagOptions.map((tag) => (
+              <option key={tag} value={tag}>
+                {tag}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span className="chart-filters__count" aria-live="polite">
+          {visiblePeople.length} of {activeChart.people.length} people
+        </span>
+        <button
+          type="button"
+          className="chart-filters__clear"
+          disabled={!filtersActive}
+          title="Clear filters"
+          aria-label="Clear all filters"
+          onClick={() => {
+            setSponsorFilter('');
+            setManagerFilter('');
+            setTagFilter('');
+          }}
+        >
+          <X aria-hidden="true" />
+        </button>
+      </div>}
 
       <div className="chart-canvas">
         <ReactFlow
@@ -158,6 +265,38 @@ export function ChartView() {
           <Controls />
           <MiniMap pannable zoomable />
         </ReactFlow>
+        {legendEntries.length > 0 && (
+          <aside className="chart-legend" aria-label="Colour coding legend">
+            <strong>Colour key</strong>
+            <div className="chart-legend__entries">
+              {legendEntries.map((entry) => (
+                <div key={`${entry.label}-${entry.edgeColor}-${entry.backgroundColor}`} className="chart-legend__entry">
+                  <span
+                    className="chart-legend__swatch"
+                    style={{ backgroundColor: entry.backgroundColor, borderLeftColor: entry.edgeColor }}
+                    aria-hidden="true"
+                  />
+                  <span>{entry.label}</span>
+                </div>
+              ))}
+            </div>
+          </aside>
+        )}
+        {filtersActive && visiblePeople.length === 0 && (
+          <div className="chart-canvas__empty">
+            <strong>No people match these filters</strong>
+            <button
+              type="button"
+              onClick={() => {
+                setSponsorFilter('');
+                setManagerFilter('');
+                setTagFilter('');
+              }}
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
       </div>
 
       {exporting && (

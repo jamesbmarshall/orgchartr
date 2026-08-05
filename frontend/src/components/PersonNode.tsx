@@ -1,11 +1,13 @@
 import { Handle, Position as FlowPosition, type NodeProps } from '@xyflow/react';
 import { Pencil, Trash2 } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import type { Person, Sponsor } from '../types';
 import { photoUrl } from '../api/client';
+import { readableTextColor } from '../utils/personColors';
 
 export interface PersonNodeData extends Record<string, unknown> {
   person: Person;
-  sponsor: Sponsor | undefined;
+  sponsors: Sponsor[];
   onEdit: (person: Person) => void;
   onDelete: (person: Person) => void;
 }
@@ -20,11 +22,19 @@ function initials(name: string): string {
 }
 
 export function PersonNode({ data }: NodeProps & { data: PersonNodeData }) {
-  const { person, sponsor, onEdit, onDelete } = data;
+  const { person, sponsors, onEdit, onDelete } = data;
   const photo = photoUrl(person.photo);
+  const backgroundColor = person.backgroundColor ?? 'var(--surface)';
+  const edgeColor = person.edgeColor ?? 'var(--border)';
+  const textColor = person.backgroundColor ? readableTextColor(person.backgroundColor) : 'var(--text)';
+  const nodeStyle = {
+    '--person-background': backgroundColor,
+    '--person-edge': edgeColor,
+    '--person-text': textColor,
+  } as CSSProperties;
 
   return (
-    <div className="person-node">
+    <div className="person-node" style={nodeStyle}>
       <Handle type="target" position={FlowPosition.Top} />
       <div className="person-node__header">
         {photo ? (
@@ -39,9 +49,9 @@ export function PersonNode({ data }: NodeProps & { data: PersonNodeData }) {
         </div>
       </div>
 
-      {sponsor && (
-        <div className="person-node__sponsor" title={`Microsoft sponsor: ${sponsor.name}`}>
-          🎗️ {sponsor.name}
+      {sponsors.length > 0 && (
+        <div className="person-node__sponsor" title={`Microsoft sponsors: ${sponsors.map((sponsor) => sponsor.name).join(', ')}`}>
+          🎗️ {sponsors.map((sponsor) => sponsor.name).join(', ')}
         </div>
       )}
 

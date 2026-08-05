@@ -12,6 +12,20 @@ import fs from 'fs';
 
 const router = Router();
 
+type StoredPerson = Omit<Person, 'sponsorIds'> & {
+  sponsorIds?: string[];
+  sponsorId?: string | null;
+  edgeColor?: string | null;
+  backgroundColor?: string | null;
+  colorLabel?: string;
+};
+
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
+function parseColor(value: unknown): string | null {
+  return typeof value === 'string' && HEX_COLOR.test(value) ? value : null;
+}
+
 function slugify(name: string): string {
   const base = name
     .toLowerCase()
@@ -24,7 +38,21 @@ function slugify(name: string): string {
 function loadChart(id: string): Chart | null {
   const filePath = chartFilePath(id);
   if (!fs.existsSync(filePath)) return null;
-  return readJson<Chart>(filePath, { id, partnerName: id, people: [] });
+  const chart = readJson<Omit<Chart, 'people'> & { people: StoredPerson[] }>(filePath, {
+    id,
+    partnerName: id,
+    people: [],
+  });
+  return {
+    ...chart,
+    people: chart.people.map(({ sponsorId, ...person }) => ({
+      ...person,
+      sponsorIds: Array.isArray(person.sponsorIds) ? person.sponsorIds : sponsorId ? [sponsorId] : [],
+      edgeColor: parseColor(person.edgeColor),
+      backgroundColor: parseColor(person.backgroundColor),
+      colorLabel: typeof person.colorLabel === 'string' ? person.colorLabel : '',
+    })),
+  };
 }
 
 function saveChart(chart: Chart): void {
@@ -104,7 +132,7 @@ router.post('/:id/people', (req, res) => {
   const chart = loadChart(req.params.id);
   if (!chart) return res.status(404).json({ error: 'Chart not found' });
 
-  const { name, title, department, photo, managerId, sponsorId, tags } = req.body ?? {};
+  const { name, title, department, photo, managerId, sponsorIds, tags, edgeColor, backgroundColor, colorLabel } = req.body ?? {};
   if (!name || typeof name !== 'string') {
     return res.status(400).json({ error: 'name is required' });
   }
@@ -119,8 +147,11 @@ router.post('/:id/people', (req, res) => {
     department: department ?? '',
     photo: photo ?? null,
     managerId: managerId ?? null,
-    sponsorId: sponsorId ?? null,
+    sponsorIds: Array.isArray(sponsorIds) ? sponsorIds.filter((id): id is string => typeof id === 'string') : [],
     tags: Array.isArray(tags) ? tags : [],
+    edgeColor: parseColor(edgeColor),
+    backgroundColor: parseColor(backgroundColor),
+    colorLabel: typeof colorLabel === 'string' ? colorLabel.trim() : '',
     position: null,
   };
   chart.people.push(person);
@@ -135,7 +166,7 @@ router.put('/:id/people/:personId', (req, res) => {
   const person = chart.people.find((p) => p.id === req.params.personId);
   if (!person) return res.status(404).json({ error: 'Person not found' });
 
-  const { name, title, department, photo, managerId, sponsorId, tags, position } = req.body ?? {};
+  const { name, title, department, photo, managerId, sponsorIds, tags, edgeColor, backgroundColor, colorLabel, position } = req.body ?? {};
 
   if (managerId !== undefined) {
     if (managerId !== null) {
@@ -152,8 +183,13 @@ router.put('/:id/people/:personId', (req, res) => {
   if (title !== undefined) person.title = title;
   if (department !== undefined) person.department = department;
   if (photo !== undefined) person.photo = photo;
-  if (sponsorId !== undefined) person.sponsorId = sponsorId;
+  if (sponsorIds !== undefined && Array.isArray(sponsorIds)) {
+    person.sponsorIds = sponsorIds.filter((id): id is string => typeof id === 'string');
+  }
   if (tags !== undefined) person.tags = Array.isArray(tags) ? tags : person.tags;
+  if (edgeColor !== undefined) person.edgeColor = parseColor(edgeColor);
+  if (backgroundColor !== undefined) person.backgroundColor = parseColor(backgroundColor);
+  if (colorLabel !== undefined && typeof colorLabel === 'string') person.colorLabel = colorLabel.trim();
   if (position !== undefined) person.position = position;
 
   saveChart(chart);
