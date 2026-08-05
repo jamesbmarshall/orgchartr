@@ -4,6 +4,7 @@ A self-hosted org chart visualizer for tracking partner stakeholders and their M
 
 - One org chart per partner (or team) - add, edit, and remove people, and draw the reporting lines between them.
 - A shared, reusable directory of Microsoft employees ("sponsors") that you can link to any person on any chart.
+- Export the whole chart, or just chosen branches and people, as SVG, PNG, CSV, or JSON.
 - Runs locally in Docker with no cloud hosting or app accounts.
 - Stores JSON and photos in a host folder you choose. The app does not upload, sync, or back up that folder.
 
@@ -87,6 +88,20 @@ server/     Express + TypeScript API, reads/writes DATA_DIR
 data/       Default ignored data folder
 scripts/    Local setup helpers
 ```
+
+## Exporting a chart
+
+Open a chart and use **Export** in the toolbar. You can export the entire chart, or tick specific
+people and optionally pull in everyone reporting into them and/or their management chain.
+
+| Format | Use it for |
+| --- | --- |
+| SVG | PowerPoint. Insert > Pictures > This device, and the chart stays sharp at any size (and stays editable via Graphic > Convert to Shape). |
+| PNG | A flat picture for slides, docs, or chat. Rendered at 2x for crisp text. |
+| CSV | Excel, or bulk review of names, titles, managers, sponsors, and tags. |
+| JSON | Structured data, including tags and saved positions. |
+
+Photos are embedded in the SVG and PNG exports, so the files stand alone once downloaded.
 
 ## Notes
 
