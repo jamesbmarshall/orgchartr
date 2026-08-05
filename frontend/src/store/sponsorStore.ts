@@ -1,12 +1,14 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
-import type { Sponsor } from '../types';
+import type { Sponsor, SponsorUsageEntry } from '../types';
 
 interface SponsorStoreState {
   sponsors: Sponsor[];
   loading: boolean;
   error: string | null;
+  usage: Record<string, SponsorUsageEntry[]>;
   load: () => Promise<void>;
+  loadUsage: () => Promise<void>;
   addSponsor: (data: Partial<Sponsor>) => Promise<Sponsor>;
   updateSponsor: (id: string, patch: Partial<Sponsor>) => Promise<void>;
   deleteSponsor: (id: string) => Promise<void>;
@@ -16,6 +18,7 @@ export const useSponsorStore = create<SponsorStoreState>((set, get) => ({
   sponsors: [],
   loading: false,
   error: null,
+  usage: {},
 
   load: async () => {
     set({ loading: true, error: null });
@@ -24,6 +27,15 @@ export const useSponsorStore = create<SponsorStoreState>((set, get) => ({
       set({ sponsors, loading: false });
     } catch (err) {
       set({ error: (err as Error).message, loading: false });
+    }
+  },
+
+  loadUsage: async () => {
+    try {
+      const usage = await api.sponsorUsage();
+      set({ usage });
+    } catch {
+      // Usage info is supplementary (badges/delete-confirm details); ignore failures silently.
     }
   },
 

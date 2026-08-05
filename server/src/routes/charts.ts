@@ -6,6 +6,8 @@ import {
   saveChart,
   deleteChartFile,
   garbageCollectPhotos,
+  listChartHistory,
+  restoreChartFromHistory,
 } from '../lib/dataStore';
 import type { Chart, Person } from '../types';
 
@@ -47,7 +49,7 @@ router.post('/', (req, res) => {
   if (index.some((e) => e.id === id)) {
     id = `${id}-${nanoid(5).toLowerCase()}`;
   }
-  const chart: Chart = { id, partnerName: partnerName.trim(), people: [] };
+  const chart: Chart = { id, partnerName: partnerName.trim(), description: '', people: [] };
   saveChart(chart);
   res.status(201).json(chart);
 });
@@ -59,13 +61,16 @@ router.get('/:id', (req, res) => {
   res.json(chart);
 });
 
-// PATCH /api/charts/:id - rename
+// PATCH /api/charts/:id - rename and/or update notes
 router.patch('/:id', (req, res) => {
   const chart = loadChart(req.params.id);
   if (!chart) return res.status(404).json({ error: 'Chart not found' });
-  const { partnerName } = req.body ?? {};
+  const { partnerName, description } = req.body ?? {};
   if (typeof partnerName === 'string' && partnerName.trim()) {
     chart.partnerName = partnerName.trim();
+  }
+  if (typeof description === 'string') {
+    chart.description = description;
   }
   saveChart(chart);
   res.json(chart);
@@ -77,6 +82,24 @@ router.delete('/:id', (req, res) => {
   if (!found) return res.status(404).json({ error: 'Chart not found' });
   garbageCollectPhotos();
   res.status(204).end();
+});
+
+// GET /api/charts/:id/history - list saved point-in-time snapshots, newest first
+router.get('/:id/history', (req, res) => {
+  if (!loadChart(req.params.id)) return res.status(404).json({ error: 'Chart not found' });
+  res.json(listChartHistory(req.params.id));
+});
+
+// POST /api/charts/:id/history/restore - roll the chart back to a saved snapshot
+router.post('/:id/history/restore', (req, res) => {
+  if (!loadChart(req.params.id)) return res.status(404).json({ error: 'Chart not found' });
+  const { timestamp } = req.body ?? {};
+  if (typeof timestamp !== 'string') {
+    return res.status(400).json({ error: 'timestamp is required' });
+  }
+  const restored = restoreChartFromHistory(req.params.id, timestamp);
+  if (!restored) return res.status(404).json({ error: 'That snapshot no longer exists.' });
+  res.json(restored);
 });
 
 // PATCH /api/charts/:id/positions - batch-update multiple people's saved canvas positions in one write

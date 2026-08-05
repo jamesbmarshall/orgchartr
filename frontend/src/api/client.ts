@@ -1,4 +1,4 @@
-import type { Chart, ChartIndexEntry, Person, Sponsor } from '../types';
+import type { Chart, ChartHistoryEntry, ChartIndexEntry, Person, Sponsor, SponsorUsageEntry } from '../types';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -27,7 +27,12 @@ export const api = {
     request<Chart>('/api/charts', { method: 'POST', body: JSON.stringify({ partnerName }) }),
   renameChart: (id: string, partnerName: string) =>
     request<Chart>(`/api/charts/${id}`, { method: 'PATCH', body: JSON.stringify({ partnerName }) }),
+  updateChartDescription: (id: string, description: string) =>
+    request<Chart>(`/api/charts/${id}`, { method: 'PATCH', body: JSON.stringify({ description }) }),
   deleteChart: (id: string) => request<void>(`/api/charts/${id}`, { method: 'DELETE' }),
+  listChartHistory: (id: string) => request<ChartHistoryEntry[]>(`/api/charts/${id}/history`),
+  restoreChartHistory: (id: string, timestamp: string) =>
+    request<Chart>(`/api/charts/${id}/history/restore`, { method: 'POST', body: JSON.stringify({ timestamp }) }),
 
   // People
   addPerson: (chartId: string, person: Partial<Person>) =>
@@ -47,6 +52,7 @@ export const api = {
 
   // Sponsors
   listSponsors: () => request<Sponsor[]>('/api/sponsors'),
+  sponsorUsage: () => request<Record<string, SponsorUsageEntry[]>>('/api/sponsors/usage'),
   addSponsor: (sponsor: Partial<Sponsor>) =>
     request<Sponsor>('/api/sponsors', { method: 'POST', body: JSON.stringify(sponsor) }),
   updateSponsor: (id: string, patch: Partial<Sponsor>) =>

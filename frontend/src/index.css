@@ -149,6 +149,12 @@ select {
   object-fit: cover;
 }
 
+.sponsor-card__usage {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin: -0.2rem 0 0;
+}
+
 .chart-view {
   display: flex;
   flex-direction: column;
@@ -685,4 +691,82 @@ select {
   color: var(--text-muted);
   font-size: 0.8rem;
   margin: 0.25rem 0 0;
+}
+
+.chart-notes {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.65rem 1.25rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.chart-notes svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 0.15rem;
+}
+
+.chart-notes p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.chart-notes--editing {
+  cursor: default;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.chart-notes--editing textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+  color: var(--text);
+}
+
+.chart-notes__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.history-list__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.history-list__date {
+  font-size: 0.9rem;
+}
+
+.history-list__meta {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.history-list__restored {
+  color: var(--success, #4caf50);
+  font-size: 0.85rem;
 }

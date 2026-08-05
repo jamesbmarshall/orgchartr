@@ -19,7 +19,15 @@ export interface Person {
 export interface Chart {
   id: string;
   partnerName: string;
+  /** Free-text notes about this chart/partner. Empty string if never set. */
+  description: string;
   people: Person[];
+}
+
+export interface ChartHistoryEntry {
+  /** ISO timestamp identifying (and used to look up) this snapshot. */
+  timestamp: string;
+  personCount: number;
 }
 
 export interface ChartIndexEntry {

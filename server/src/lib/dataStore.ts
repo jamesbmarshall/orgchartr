@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import type { Chart, ChartIndexEntry, Person, Sponsor } from '../types';
+import type { Chart, ChartHistoryEntry, ChartIndexEntry, Person, Sponsor } from '../types';
 
 // Resolve the data directory: DATA_DIR env var wins (used in Docker),
 // otherwise fall back to <repo root>/data for local `npm run dev`.
@@ -76,13 +76,13 @@ export function parseColor(value: unknown): string | null {
 export function loadChart(id: string): Chart | null {
   const filePath = chartFilePath(id);
   if (!fs.existsSync(filePath)) return null;
-  const chart = readJson<Omit<Chart, 'people'> & { people: StoredPerson[] }>(filePath, {
-    id,
-    partnerName: id,
-    people: [],
-  });
+  const chart = readJson<Omit<Chart, 'people' | 'description'> & { people: StoredPerson[]; description?: string }>(
+    filePath,
+    { id, partnerName: id, people: [] },
+  );
   return {
     ...chart,
+    description: typeof chart.description === 'string' ? chart.description : '',
     people: chart.people.map(({ sponsorId, ...person }) => ({
       ...person,
       sponsorIds: Array.isArray(person.sponsorIds) ? person.sponsorIds : sponsorId ? [sponsorId] : [],
@@ -97,8 +97,89 @@ export function loadChart(id: string): Chart | null {
   };
 }
 
+const CHART_HISTORY_DIR = path.join(CHARTS_DIR, 'history');
+/** Minimum time between automatic snapshots for the same chart, to bound history size. */
+const SNAPSHOT_MIN_INTERVAL_MS = 5 * 60 * 1000;
+/** Snapshots kept per chart before the oldest is pruned. */
+const MAX_HISTORY_SNAPSHOTS = 30;
+
+function chartHistoryDir(id: string): string {
+  return path.join(CHART_HISTORY_DIR, id);
+}
+
+function listSnapshotEpochs(id: string): number[] {
+  const dir = chartHistoryDir(id);
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.json'))
+    .map((f) => Number(f.replace('.json', '')))
+    .filter((n) => !Number.isNaN(n))
+    .sort((a, b) => a - b);
+}
+
+/**
+ * Copies the chart's current on-disk content into its history folder, so it can be browsed and
+ * restored later. Throttled to at most once every SNAPSHOT_MIN_INTERVAL_MS per chart (unless
+ * `force` is set, used as a safety net right before a destructive restore). Call this BEFORE
+ * overwriting the chart file with new content - it snapshots what's about to be replaced.
+ */
+function snapshotChartHistory(id: string, force = false): void {
+  const filePath = chartFilePath(id);
+  if (!fs.existsSync(filePath)) return;
+  const epochs = listSnapshotEpochs(id);
+  const now = Date.now();
+  const last = epochs[epochs.length - 1];
+  if (!force && last && now - last < SNAPSHOT_MIN_INTERVAL_MS) return;
+  const dir = chartHistoryDir(id);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.copyFileSync(filePath, path.join(dir, `${now}.json`));
+  const all = [...epochs, now];
+  while (all.length > MAX_HISTORY_SNAPSHOTS) {
+    const oldest = all.shift();
+    try {
+      fs.rmSync(path.join(dir, `${oldest}.json`));
+    } catch {
+      // Best-effort pruning; ignore snapshots that can't be removed.
+    }
+  }
+}
+
+/** Lists this chart's saved snapshots, newest first. */
+export function listChartHistory(id: string): ChartHistoryEntry[] {
+  const dir = chartHistoryDir(id);
+  if (!fs.existsSync(dir)) return [];
+  return listSnapshotEpochs(id)
+    .map((epoch) => {
+      let personCount = 0;
+      try {
+        const data = readJson<{ people?: unknown[] }>(path.join(dir, `${epoch}.json`), {});
+        personCount = Array.isArray(data.people) ? data.people.length : 0;
+      } catch {
+        // Ignore an unreadable/corrupt snapshot file.
+      }
+      return { timestamp: new Date(epoch).toISOString(), personCount };
+    })
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+}
+
+/** Restores a chart to a previously-saved snapshot. Always snapshots the current state first
+ * (regardless of throttling) so the restore itself can be undone via history. Returns the
+ * restored, freshly-migrated chart, or null if the chart or snapshot doesn't exist. */
+export function restoreChartFromHistory(id: string, timestamp: string): Chart | null {
+  const epoch = Date.parse(timestamp);
+  if (Number.isNaN(epoch)) return null;
+  const snapshotPath = path.join(chartHistoryDir(id), `${epoch}.json`);
+  if (!fs.existsSync(snapshotPath)) return null;
+  snapshotChartHistory(id, true);
+  const snapshot = readJson<Chart>(snapshotPath, { id, partnerName: id, description: '', people: [] });
+  saveChart(snapshot);
+  return loadChart(id);
+}
+
 /** Persists a chart and refreshes its index entry (person count, last-updated timestamp). */
 export function saveChart(chart: Chart): void {
+  snapshotChartHistory(chart.id);
   writeJsonAtomic(chartFilePath(chart.id), chart);
   const index = readIndex();
   const entry: ChartIndexEntry = {
@@ -113,11 +194,13 @@ export function saveChart(chart: Chart): void {
   writeIndex(index);
 }
 
-/** Deletes a chart's file and its index entry. Does not garbage-collect photos; call garbageCollectPhotos() after. */
+/** Deletes a chart's file, index entry, and saved history snapshots. Does not garbage-collect
+ * photos; call garbageCollectPhotos() after. */
 export function deleteChartFile(id: string): boolean {
   const filePath = chartFilePath(id);
   if (!fs.existsSync(filePath)) return false;
   fs.rmSync(filePath);
+  fs.rmSync(chartHistoryDir(id), { recursive: true, force: true });
   writeIndex(readIndex().filter((e) => e.id !== id));
   return true;
 }
@@ -172,4 +255,32 @@ export function garbageCollectPhotos(): void {
       }
     }
   }
+}
+
+export interface SponsorUsageEntry {
+  chartId: string;
+  chartName: string;
+  personId: string;
+  personName: string;
+}
+
+/** Builds a map of sponsorId -> the people (across all charts) currently linked to it. Used to
+ * show "used by" info before deleting a sponsor. */
+export function computeSponsorUsage(): Record<string, SponsorUsageEntry[]> {
+  const usage: Record<string, SponsorUsageEntry[]> = {};
+  for (const id of listChartIds()) {
+    const chart = loadChart(id);
+    if (!chart) continue;
+    for (const person of chart.people) {
+      for (const sponsorId of person.sponsorIds) {
+        (usage[sponsorId] ??= []).push({
+          chartId: chart.id,
+          chartName: chart.partnerName,
+          personId: person.id,
+          personName: person.name,
+        });
+      }
+    }
+  }
+  return usage;
 }

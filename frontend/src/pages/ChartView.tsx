@@ -10,8 +10,9 @@ import {
   type Node,
   type Edge,
   type OnNodeDrag,
+  type OnConnect,
 } from '@xyflow/react';
-import { Filter, Search, X } from 'lucide-react';
+import { Filter, History, Search, StickyNote, X } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
 import { useChartStore } from '../store/chartStore';
 import { useSponsorStore } from '../store/sponsorStore';
@@ -22,6 +23,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useUndoStore } from '../store/undoStore';
 import { ExportModal } from '../components/ExportModal';
 import { ImportModal } from '../components/ImportModal';
+import { HistoryModal } from '../components/HistoryModal';
 import type { Person } from '../types';
 import { colorLegendEntries } from '../utils/personColors';
 import { comparePeopleBySurname } from '../utils/personNames';
@@ -57,6 +59,7 @@ export function ChartView() {
     loadChart,
     clearActiveChart,
     renameChart,
+    updateChartDescription,
     addPerson,
     updatePerson,
     deletePerson,
@@ -88,6 +91,12 @@ export function ChartView() {
   const [renameError, setRenameError] = useState<string | null>(null);
   const [resettingLayout, setResettingLayout] = useState(false);
   const [resetLayoutError, setResetLayoutError] = useState<string | null>(null);
+  const [reparentError, setReparentError] = useState<string | null>(null);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesDraft, setNotesDraft] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [notesError, setNotesError] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   // Bumped after a bulk "reset layout" to force the canvas to remount: replacing every node's
   // position at once can leave @xyflow/react's internal measurement state stuck (nodes rendered
   // with visibility:hidden forever). Remounting is the reliable way to recover from that.
@@ -205,6 +214,21 @@ export function ChartView() {
     [updatePerson],
   );
 
+  // Dragging from a person's bottom (source) handle to another person's top (target) handle
+  // sets the target person's manager to the source person. The server validates that this
+  // doesn't create a cycle; edges are re-derived from activeChart once the update lands, so
+  // there's no local edge state to reconcile on failure.
+  const onConnect: OnConnect = useCallback(
+    ({ source, target }) => {
+      if (!source || !target || source === target) return;
+      setReparentError(null);
+      updatePerson(target, { managerId: source }).catch((err) => {
+        setReparentError(err instanceof Error ? err.message : 'Could not update the reporting line. Please try again.');
+      });
+    },
+    [updatePerson],
+  );
+
   async function handleResetLayout() {
     if (!activeChart) return;
     setResettingLayout(true);
@@ -235,6 +259,27 @@ export function ChartView() {
       setRenaming(false);
     } catch (err) {
       setRenameError(err instanceof Error ? err.message : 'Could not rename the chart. Please try again.');
+    }
+  }
+
+  function startEditingNotes() {
+    setNotesDraft(activeChart?.description ?? '');
+    setNotesError(null);
+    setEditingNotes(true);
+  }
+
+  async function submitNotes(e: React.FormEvent) {
+    e.preventDefault();
+    if (!chartId) return;
+    setSavingNotes(true);
+    setNotesError(null);
+    try {
+      await updateChartDescription(chartId, notesDraft.trim());
+      setEditingNotes(false);
+    } catch (err) {
+      setNotesError(err instanceof Error ? err.message : 'Could not save notes. Please try again.');
+    } finally {
+      setSavingNotes(false);
     }
   }
 
@@ -297,9 +342,57 @@ export function ChartView() {
           <button type="button" onClick={handleResetLayout} disabled={resettingLayout}>
             {resettingLayout ? 'Resetting…' : 'Reset layout'}
           </button>
+          <button
+            type="button"
+            className={`chart-toolbar__icon-button${activeChart.description ? ' chart-toolbar__icon-button--active' : ''}`}
+            title="Chart notes"
+            aria-label="Chart notes"
+            aria-expanded={editingNotes}
+            onClick={() => (editingNotes ? setEditingNotes(false) : startEditingNotes())}
+          >
+            <StickyNote aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="chart-toolbar__icon-button"
+            title="Version history"
+            aria-label="View chart version history"
+            onClick={() => setShowHistory(true)}
+          >
+            <History aria-hidden="true" />
+          </button>
         </div>
       </div>
       {resetLayoutError && <p className="error-text">{resetLayoutError}</p>}
+      {reparentError && <p className="error-text">{reparentError}</p>}
+
+      {editingNotes ? (
+        <form onSubmit={submitNotes} className="chart-notes chart-notes--editing">
+          <textarea
+            value={notesDraft}
+            onChange={(e) => setNotesDraft(e.target.value)}
+            placeholder="Notes about this partner or chart…"
+            rows={3}
+            autoFocus
+          />
+          <div className="chart-notes__actions">
+            <button type="submit" className="primary" disabled={savingNotes}>
+              {savingNotes ? 'Saving…' : 'Save notes'}
+            </button>
+            <button type="button" onClick={() => setEditingNotes(false)} disabled={savingNotes}>
+              Cancel
+            </button>
+          </div>
+          {notesError && <p className="error-text">{notesError}</p>}
+        </form>
+      ) : (
+        activeChart.description && (
+          <div className="chart-notes" onClick={startEditingNotes} title="Click to edit notes">
+            <StickyNote aria-hidden="true" />
+            <p>{activeChart.description}</p>
+          </div>
+        )
+      )}
 
       {showFilters && <div id="chart-filters" className="chart-filters" aria-label="Chart filters">
         <label>
@@ -364,6 +457,7 @@ export function ChartView() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onNodeDragStop={onNodeDragStop}
+          onConnect={onConnect}
           nodeTypes={nodeTypes}
           colorMode="dark"
           fitView
@@ -427,6 +521,13 @@ export function ChartView() {
           onUpdatePerson={updatePerson}
           onCreateSponsor={(name) => addSponsor({ name })}
           onClose={() => setImporting(false)}
+        />
+      )}
+
+      {showHistory && chartId && (
+        <HistoryModal
+          chartId={chartId}
+          onClose={() => setShowHistory(false)}
         />
       )}
 

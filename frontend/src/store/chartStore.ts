@@ -14,6 +14,7 @@ interface ChartStoreState {
   loadIndex: () => Promise<void>;
   createChart: (partnerName: string) => Promise<Chart>;
   renameChart: (id: string, partnerName: string) => Promise<void>;
+  updateChartDescription: (id: string, description: string) => Promise<void>;
   deleteChart: (id: string) => Promise<void>;
 
   loadChart: (id: string) => Promise<void>;
@@ -22,6 +23,7 @@ interface ChartStoreState {
   updatePerson: (personId: string, patch: Partial<Person>) => Promise<void>;
   deletePerson: (personId: string) => Promise<void>;
   updatePositions: (positions: Record<string, { x: number; y: number }>) => Promise<void>;
+  restoreFromHistory: (timestamp: string) => Promise<void>;
 }
 
 export const useChartStore = create<ChartStoreState>((set, get) => ({
@@ -54,6 +56,12 @@ export const useChartStore = create<ChartStoreState>((set, get) => ({
     await get().loadIndex();
     const active = get().activeChart;
     if (active?.id === id) set({ activeChart: { ...active, partnerName } });
+  },
+
+  updateChartDescription: async (id: string, description: string) => {
+    const updated = await api.updateChartDescription(id, description);
+    const active = get().activeChart;
+    if (active?.id === id) set({ activeChart: updated });
   },
 
   deleteChart: async (id: string) => {
@@ -110,5 +118,13 @@ export const useChartStore = create<ChartStoreState>((set, get) => ({
     if (!active) throw new Error('No active chart loaded');
     const updated = await api.updatePositions(active.id, positions);
     set((state) => (state.activeChart?.id === active.id ? { activeChart: updated } : {}));
+  },
+
+  restoreFromHistory: async (timestamp: string) => {
+    const active = get().activeChart;
+    if (!active) throw new Error('No active chart loaded');
+    const restored = await api.restoreChartHistory(active.id, timestamp);
+    set((state) => (state.activeChart?.id === active.id ? { activeChart: restored } : {}));
+    await get().loadIndex();
   },
 }));

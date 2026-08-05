@@ -7,6 +7,7 @@ import {
   loadChart,
   saveChart,
   garbageCollectPhotos,
+  computeSponsorUsage,
 } from '../lib/dataStore';
 import type { Sponsor } from '../types';
 
@@ -14,6 +15,11 @@ const router = Router();
 
 router.get('/', (_req, res) => {
   res.json(loadSponsors());
+});
+
+// GET /api/sponsors/usage - which people/charts currently reference each sponsor
+router.get('/usage', (_req, res) => {
+  res.json(computeSponsorUsage());
 });
 
 router.post('/', (req, res) => {

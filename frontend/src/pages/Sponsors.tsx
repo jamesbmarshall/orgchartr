@@ -8,7 +8,7 @@ import { photoUrl } from '../api/client';
 import type { Sponsor } from '../types';
 
 export function Sponsors() {
-  const { sponsors, loading, error, load, addSponsor, updateSponsor, deleteSponsor } = useSponsorStore();
+  const { sponsors, loading, error, usage, load, loadUsage, addSponsor, updateSponsor, deleteSponsor } = useSponsorStore();
   const { scheduleDelete } = useUndoStore();
   const [editing, setEditing] = useState<Sponsor | 'new' | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Sponsor | null>(null);
@@ -17,7 +17,8 @@ export function Sponsors() {
 
   useEffect(() => {
     load();
-  }, [load]);
+    loadUsage();
+  }, [load, loadUsage]);
 
   const filteredSponsors = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -47,6 +48,17 @@ export function Sponsors() {
           return next;
         }),
     );
+  }
+
+  function deleteMessage(sponsor: Sponsor): string {
+    const entries = usage[sponsor.id] ?? [];
+    if (entries.length === 0) {
+      return `Remove ${sponsor.name} from the sponsor directory? You'll have a few seconds to undo.`;
+    }
+    const chartNames = [...new Set(entries.map((e) => e.chartName))];
+    const peopleLabel = entries.length === 1 ? '1 person' : `${entries.length} people`;
+    const chartLabel = chartNames.length === 1 ? chartNames[0] : `${chartNames.length} charts`;
+    return `Remove ${sponsor.name} from the sponsor directory? They're currently linked to ${peopleLabel} on ${chartLabel} - that link will be removed. You'll have a few seconds to undo.`;
   }
 
   return (
@@ -80,12 +92,16 @@ export function Sponsors() {
       <div className="chart-grid">
         {filteredSponsors.map((sponsor) => {
           const photo = photoUrl(sponsor.photo);
+          const usageCount = (usage[sponsor.id] ?? []).length;
           return (
             <div key={sponsor.id} className="sponsor-card">
               {photo && <img src={photo} alt={sponsor.name} className="sponsor-card__photo" />}
               <h2>{sponsor.name}</h2>
               <p>{sponsor.title}</p>
               <p className="chart-card__updated">{sponsor.department}</p>
+              <p className="sponsor-card__usage">
+                {usageCount > 0 ? `Used by ${usageCount} ${usageCount === 1 ? 'person' : 'people'}` : 'Not currently used'}
+              </p>
               {sponsor.tags.length > 0 && (
                 <div className="person-node__tags">
                   {sponsor.tags.map((tag) => (
@@ -127,7 +143,7 @@ export function Sponsors() {
       {pendingDelete && (
         <ConfirmDialog
           title="Delete sponsor"
-          message={`Remove ${pendingDelete.name} from the sponsor directory? Any people currently linked to this sponsor will lose that link. You'll have a few seconds to undo.`}
+          message={deleteMessage(pendingDelete)}
           confirmLabel="Delete"
           danger
           onConfirm={handleConfirmDelete}
