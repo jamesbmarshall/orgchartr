@@ -3,13 +3,18 @@ import { computeAutoLayout, NODE_HEIGHT, personNodeWidth } from '../layout/autoL
 import { photoUrl } from '../api/client';
 import { colorLegendEntries, readableTextColor } from './personColors';
 
-export type ExportFormat = 'svg' | 'png' | 'csv' | 'json';
+export type ExportFormat = 'svg' | 'png' | 'csv' | 'json' | 'package';
 
 export const EXPORT_FORMATS: { value: ExportFormat; label: string; hint: string }[] = [
   { value: 'svg', label: 'SVG (vector)', hint: 'Best for PowerPoint — insert as a picture and it stays sharp at any size.' },
   { value: 'png', label: 'PNG (image)', hint: 'Drop straight onto a slide when you want a flat picture.' },
   { value: 'csv', label: 'CSV (spreadsheet)', hint: 'One row per person, for Excel or bulk edits.' },
   { value: 'json', label: 'JSON (data)', hint: 'Full structured data, including positions and tags.' },
+  {
+    value: 'package',
+    label: 'Portable package (ZIP)',
+    hint: 'A re-importable chart with its sponsor mappings and referenced photos.',
+  },
 ];
 
 const PNG_SCALE = 2;

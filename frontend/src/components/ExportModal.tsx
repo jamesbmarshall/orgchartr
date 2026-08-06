@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Person, Sponsor } from '../types';
+import { api } from '../api/client';
 import { buildSubset, getDescendantIds } from '../utils/orgTree';
 import {
   EXPORT_FORMATS,
@@ -15,13 +16,14 @@ import {
 type Scope = 'all' | 'selection';
 
 interface ExportModalProps {
+  chartId: string;
   partnerName: string;
   people: Person[];
   sponsors: Sponsor[];
   onClose: () => void;
 }
 
-export function ExportModal({ partnerName, people, sponsors, onClose }: ExportModalProps) {
+export function ExportModal({ chartId, partnerName, people, sponsors, onClose }: ExportModalProps) {
   const [scope, setScope] = useState<Scope>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [includeDescendants, setIncludeDescendants] = useState(true);
@@ -89,6 +91,9 @@ export function ExportModal({ partnerName, people, sponsors, onClose }: ExportMo
           new Blob([buildJson(partnerName, exportPeople)], { type: 'application/json' }),
           `${base}.json`,
         );
+      } else if (format === 'package') {
+        const blob = await api.exportChartPackage(chartId, exportPeople.map((person) => person.id));
+        downloadBlob(blob, `${base}.orgchartr.zip`);
       } else {
         const svg = await buildSvg(exportPeople, { title: partnerName, sponsorById });
         if (format === 'svg') {

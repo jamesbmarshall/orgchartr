@@ -7,6 +7,7 @@ import chartsRouter from './routes/charts';
 import sponsorsRouter from './routes/sponsors';
 import photosRouter from './routes/photos';
 import backupRouter from './routes/backup';
+import packagesRouter from './routes/packages';
 
 ensureDataDirs();
 
@@ -24,6 +25,7 @@ app.use('/api/charts', chartsRouter);
 app.use('/api/sponsors', sponsorsRouter);
 app.use('/api/photos', photosRouter);
 app.use('/api/backup', backupRouter);
+app.use('/api/packages', packagesRouter);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 

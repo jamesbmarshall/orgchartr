@@ -66,7 +66,9 @@ Select `$destination` in the picker. The copy command intentionally excludes any
 
 ### Backup and portability
 
-Use **Export backup** on the dashboard to download one ZIP containing all charts, chart history, sponsors, and photos. Use **Restore from backup** to replace all data in another orgchartr installation with that portable copy. Existing backups created before the versioned backup manifest was introduced remain supported.
+For a single chart, choose **Portable package (ZIP)** from the chart's **Export** dialog. The package contains the selected people, their mappings, referenced Microsoft sponsors, and referenced photos. Use **Import chart package** on the dashboard to add it as a new chart without replacing existing data. Existing sponsors are reused when their ID and name, or their name, matches the package.
+
+For the whole installation, use **Export backup** on the dashboard to download one ZIP containing all charts, chart history, sponsors, and photos. Use **Restore from backup** to replace all data in another orgchartr installation with that portable copy. Existing backups created before the versioned backup manifest was introduced remain supported.
 
 The selected live data directory must have one owning orgchartr container. Do not run multiple containers against the same OneDrive, Dropbox, SMB, or other shared folder. Share or move the exported ZIP instead, then restore it into the destination installation.
 
@@ -105,8 +107,9 @@ people and optionally pull in everyone reporting into them and/or their manageme
 | PNG | A flat picture for slides, docs, or chat. Rendered at 2x for crisp text. |
 | CSV | Excel, or bulk review of names, titles, managers, sponsors, and tags. |
 | JSON | Structured data, including tags and saved positions. |
+| Portable package (ZIP) | Add the chart to another orgchartr installation, including referenced sponsors, photos, and mappings. |
 
-Photos are embedded in the SVG and PNG exports, so the files stand alone once downloaded.
+Photos are embedded in SVG and PNG exports. Portable packages include referenced photos as separate assets inside the ZIP so the package can be imported on the dashboard.
 
 ## Notes
 

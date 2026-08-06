@@ -16,6 +16,9 @@ export function Dashboard() {
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
 
+  const [importingPackage, setImportingPackage] = useState(false);
+  const [packageError, setPackageError] = useState<string | null>(null);
+  const packageInputRef = useRef<HTMLInputElement>(null);
   const [exportingBackup, setExportingBackup] = useState(false);
   const [backupError, setBackupError] = useState<string | null>(null);
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
@@ -65,6 +68,19 @@ export function Dashboard() {
           return next;
         }),
     );
+  }
+
+  async function handleImportPackage(file: File) {
+    setImportingPackage(true);
+    setPackageError(null);
+    try {
+      const chart = await api.importChartPackage(file);
+      navigate(`/chart/${chart.id}`);
+    } catch (err) {
+      setPackageError(err instanceof Error ? err.message : 'Could not import that chart package.');
+    } finally {
+      setImportingPackage(false);
+    }
   }
 
   async function handleExportBackup() {
@@ -158,7 +174,26 @@ export function Dashboard() {
       </div>
 
       <div className="backup-section">
-        <span className="backup-section__label">Portable backup &amp; restore</span>
+        <span className="backup-section__label">Chart packages</span>
+        <button type="button" onClick={() => packageInputRef.current?.click()} disabled={importingPackage}>
+          {importingPackage ? 'Importing…' : 'Import chart package…'}
+        </button>
+        <input
+          ref={packageInputRef}
+          type="file"
+          accept=".zip,application/zip"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void handleImportPackage(file);
+            e.target.value = '';
+          }}
+        />
+      </div>
+      {packageError && <p className="error-text">{packageError}</p>}
+
+      <div className="backup-section">
+        <span className="backup-section__label">Full data backup &amp; restore</span>
         <button type="button" onClick={handleExportBackup} disabled={exportingBackup}>
           {exportingBackup ? 'Preparing…' : 'Export backup'}
         </button>

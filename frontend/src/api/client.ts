@@ -34,6 +34,30 @@ export const api = {
   restoreChartHistory: (id: string, timestamp: string) =>
     request<Chart>(`/api/charts/${id}/history/restore`, { method: 'POST', body: JSON.stringify({ timestamp }) }),
 
+  // Portable chart packages
+  exportChartPackage: async (chartId: string, personIds: string[]): Promise<Blob> => {
+    const res = await fetch(`/api/packages/export/${chartId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ personIds }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error ?? 'Could not create the chart package.');
+    }
+    return res.blob();
+  },
+  importChartPackage: async (file: File): Promise<Chart> => {
+    const form = new FormData();
+    form.append('package', file);
+    const res = await fetch('/api/packages/import', { method: 'POST', body: form });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error ?? 'Could not import the chart package.');
+    }
+    return res.json();
+  },
+
   // People
   addPerson: (chartId: string, person: Partial<Person>) =>
     request<Person>(`/api/charts/${chartId}/people`, { method: 'POST', body: JSON.stringify(person) }),

@@ -506,6 +506,7 @@ export function ChartView() {
 
       {exporting && (
         <ExportModal
+          chartId={activeChart.id}
           partnerName={activeChart.partnerName}
           people={activeChart.people}
           sponsors={sponsors}
