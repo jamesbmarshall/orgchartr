@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react';
+import { GripVertical, X } from 'lucide-react';
+import { useState, type DragEvent, type FormEvent } from 'react';
 import type { Person, Sponsor } from '../types';
 import { getDescendantIds } from '../utils/orgTree';
 import { colorLegendEntries, colorSchemeKey, readableTextColor } from '../utils/personColors';
@@ -34,6 +35,7 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
     }) ?? [],
   );
   const [sponsorInput, setSponsorInput] = useState('');
+  const [draggedSponsorName, setDraggedSponsorName] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>(person?.tags ?? []);
   const [tagInput, setTagInput] = useState('');
   const [photo, setPhoto] = useState<string | null>(person?.photo ?? null);
@@ -53,6 +55,9 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
 
   const excludedManagerIds = person ? new Set([person.id, ...getDescendantIds(people, person.id)]) : new Set<string>();
   const managerOptions = people.filter((p) => !excludedManagerIds.has(p.id)).toSorted(comparePeopleBySurname);
+  const sponsorOptions = sponsors
+    .filter((sponsor) => !sponsorNames.includes(sponsor.name))
+    .toSorted(comparePeopleBySurname);
   const departmentOptions = [
     ...new Map(
       people
@@ -82,6 +87,29 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
 
   function removeSponsorName(name: string) {
     setSponsorNames(sponsorNames.filter((candidate) => candidate !== name));
+  }
+
+  function startSponsorDrag(event: DragEvent<HTMLDivElement>, sponsorName: string) {
+    setDraggedSponsorName(sponsorName);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', sponsorName);
+  }
+
+  function dropSponsor(event: DragEvent<HTMLDivElement>, targetSponsorName: string) {
+    event.preventDefault();
+    const sourceSponsorName = draggedSponsorName ?? event.dataTransfer.getData('text/plain');
+    setDraggedSponsorName(null);
+    if (!sourceSponsorName || sourceSponsorName === targetSponsorName) return;
+
+    setSponsorNames((currentNames) => {
+      const sourceIndex = currentNames.indexOf(sourceSponsorName);
+      const targetIndex = currentNames.indexOf(targetSponsorName);
+      if (sourceIndex === -1 || targetIndex === -1) return currentNames;
+      const reorderedNames = [...currentNames];
+      reorderedNames.splice(sourceIndex, 1);
+      reorderedNames.splice(targetIndex, 0, sourceSponsorName);
+      return reorderedNames;
+    });
   }
 
   function selectColorScheme(key: string) {
@@ -224,22 +252,39 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
               </button>
             </div>
             <datalist id="microsoft-sponsors">
-              {sponsors.filter((sponsor) => !sponsorNames.includes(sponsor.name)).map((sponsor) => (
+              {sponsorOptions.map((sponsor) => (
                 <option key={sponsor.id} value={sponsor.name}>
                   {sponsor.title}
                 </option>
               ))}
             </datalist>
-            <div className="person-node__tags">
+            <div className="person-node__tags sponsor-order">
               {sponsorNames.map((sponsorName) => (
-                <button
+                <div
                   key={sponsorName}
-                  type="button"
-                  className="tag-chip tag-chip--removable"
-                  onClick={() => removeSponsorName(sponsorName)}
+                  className={`tag-chip sponsor-order__item${draggedSponsorName === sponsorName ? ' sponsor-order__item--dragging' : ''}`}
+                  draggable
+                  onDragStart={(event) => startSponsorDrag(event, sponsorName)}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'move';
+                  }}
+                  onDrop={(event) => dropSponsor(event, sponsorName)}
+                  onDragEnd={() => setDraggedSponsorName(null)}
+                  title="Drag to reorder"
                 >
-                  {sponsorName} ✕
-                </button>
+                  <GripVertical className="sponsor-order__grip" aria-hidden="true" />
+                  <span>{sponsorName}</span>
+                  <button
+                    type="button"
+                    className="sponsor-order__remove"
+                    onClick={() => removeSponsorName(sponsorName)}
+                    title={`Remove ${sponsorName}`}
+                    aria-label={`Remove ${sponsorName}`}
+                  >
+                    <X aria-hidden="true" />
+                  </button>
+                </div>
               ))}
             </div>
           </label>
