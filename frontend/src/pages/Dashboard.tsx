@@ -158,7 +158,7 @@ export function Dashboard() {
       </div>
 
       <div className="backup-section">
-        <span className="backup-section__label">Backup &amp; restore all data</span>
+        <span className="backup-section__label">Portable backup &amp; restore</span>
         <button type="button" onClick={handleExportBackup} disabled={exportingBackup}>
           {exportingBackup ? 'Preparing…' : 'Export backup'}
         </button>
@@ -195,7 +195,7 @@ export function Dashboard() {
       {restoreFile && (
         <ConfirmDialog
           title="Restore from backup"
-          message={`This will permanently replace ALL current charts, people, sponsors, and photos with the contents of "${restoreFile.name}". This cannot be undone. Continue?`}
+          message={`This will permanently replace ALL current charts, people, history, sponsors, and photos with the contents of "${restoreFile.name}". This cannot be undone. Continue?`}
           confirmLabel={restoring ? 'Restoring…' : 'Restore'}
           danger
           onConfirm={handleConfirmRestore}

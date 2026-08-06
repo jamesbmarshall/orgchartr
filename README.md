@@ -28,6 +28,7 @@ By default, data is stored in the ignored `data/` folder beside this README. It 
 
 - `data/charts/index.json` - the list of charts shown on the dashboard
 - `data/charts/{chartId}.json` - one file per org chart (people, reporting lines, tags, sponsor links)
+- `data/charts/history/` - recent snapshots that can be restored from each chart
 - `data/sponsors.json` - the shared Microsoft sponsor directory
 - `data/assets/photos/` - uploaded photos
 
@@ -63,9 +64,13 @@ docker compose up -d --build
 
 Select `$destination` in the picker. The copy command intentionally excludes any old `.git` directory.
 
-### Backup responsibility
+### Backup and portability
 
-orgchartr writes changes directly to the selected folder and does not keep its own history or backup. OneDrive sync provides an off-device copy, but sync can also propagate deletion or corruption. Configure OneDrive retention/version history or another backup appropriate for the sensitivity of the data.
+Use **Export backup** on the dashboard to download one ZIP containing all charts, chart history, sponsors, and photos. Use **Restore from backup** to replace all data in another orgchartr installation with that portable copy. Existing backups created before the versioned backup manifest was introduced remain supported.
+
+The selected live data directory must have one owning orgchartr container. Do not run multiple containers against the same OneDrive, Dropbox, SMB, or other shared folder. Share or move the exported ZIP instead, then restore it into the destination installation.
+
+The in-app ZIP is a point-in-time portable copy, not an off-device backup service. OneDrive sync can provide another copy of the live directory, but sync can also propagate deletion or corruption. Keep exported backups under retention/versioning appropriate for the sensitivity of the data.
 
 ## Local development (without Docker)
 
