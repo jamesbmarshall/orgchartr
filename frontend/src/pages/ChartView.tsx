@@ -89,9 +89,11 @@ export function ChartView() {
     () => new Set(loadChartViewState(chartId)?.collapsedIds ?? []),
   );
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [confirmingResetLayout, setConfirmingResetLayout] = useState(false);
   const [resettingLayout, setResettingLayout] = useState(false);
   const [resetLayoutError, setResetLayoutError] = useState<string | null>(null);
   const [reparentError, setReparentError] = useState<string | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesDraft, setNotesDraft] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
@@ -209,7 +211,12 @@ export function ChartView() {
 
   const onNodeDragStop: OnNodeDrag<Node<PersonNodeData>> = useCallback(
     (_event, node) => {
-      updatePerson(node.id, { position: { x: node.position.x, y: node.position.y } });
+      setMoveError(null);
+      updatePerson(node.id, { position: { x: node.position.x, y: node.position.y } }).catch((err) => {
+        setMoveError(
+          err instanceof Error ? err.message : 'Could not save the new position. It will revert when the chart reloads.',
+        );
+      });
     },
     [updatePerson],
   );
@@ -339,7 +346,7 @@ export function ChartView() {
           <button type="button" onClick={() => setImporting(true)}>
             Import
           </button>
-          <button type="button" onClick={handleResetLayout} disabled={resettingLayout}>
+          <button type="button" onClick={() => setConfirmingResetLayout(true)} disabled={resettingLayout}>
             {resettingLayout ? 'Resetting…' : 'Reset layout'}
           </button>
           <button
@@ -365,6 +372,7 @@ export function ChartView() {
       </div>
       {resetLayoutError && <p className="error-text">{resetLayoutError}</p>}
       {reparentError && <p className="error-text">{reparentError}</p>}
+      {moveError && <p className="error-text">{moveError}</p>}
 
       {editingNotes ? (
         <form onSubmit={submitNotes} className="chart-notes chart-notes--editing">
@@ -460,6 +468,7 @@ export function ChartView() {
           onConnect={onConnect}
           nodeTypes={nodeTypes}
           colorMode="dark"
+          deleteKeyCode={null}
           fitView
         >
           <Background />
@@ -544,6 +553,20 @@ export function ChartView() {
             setEditingPerson(null);
           }}
           onClose={() => setEditingPerson(null)}
+        />
+      )}
+
+      {confirmingResetLayout && (
+        <ConfirmDialog
+          title="Reset layout"
+          message="Rearrange everyone into the automatic layout? This replaces any positions you've dragged people to by hand and can't be undone."
+          confirmLabel="Reset layout"
+          danger
+          onConfirm={() => {
+            setConfirmingResetLayout(false);
+            handleResetLayout();
+          }}
+          onCancel={() => setConfirmingResetLayout(false)}
         />
       )}
 
