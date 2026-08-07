@@ -495,7 +495,16 @@ export function ChartView() {
             </div>
           </aside>
         )}
-        {anyFilterActive && visiblePeople.length === 0 && (
+        {activeChart.people.length === 0 && (
+          <div className="chart-canvas__empty">
+            <strong>This chart is empty</strong>
+            <p>Add the first person to start mapping {activeChart.partnerName}'s organisation.</p>
+            <button type="button" className="primary" onClick={() => setEditingPerson('new')}>
+              Add your first person
+            </button>
+          </div>
+        )}
+        {activeChart.people.length > 0 && anyFilterActive && visiblePeople.length === 0 && (
           <div className="chart-canvas__empty">
             <strong>No people match these filters</strong>
             <button

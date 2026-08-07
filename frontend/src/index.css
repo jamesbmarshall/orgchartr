@@ -321,6 +321,12 @@ textarea {
   color: var(--text-muted);
 }
 
+.chart-canvas__empty p {
+  margin: 0;
+  max-width: 36ch;
+  text-align: center;
+}
+
 .person-node {
   background: var(--person-background, var(--surface));
   border: 1px solid var(--border);
