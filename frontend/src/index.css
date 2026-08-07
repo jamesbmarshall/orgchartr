@@ -335,6 +335,17 @@ textarea {
   padding: 0.75rem;
   width: var(--person-width, 220px);
   color: var(--person-text, var(--text));
+  transition: opacity 0.15s ease;
+}
+
+/* Non-matching people while a search/filter is active: kept in place so matches
+   retain their reporting-line context, but visually pushed to the background. */
+.person-node--dimmed {
+  opacity: 0.25;
+}
+
+.person-node--dimmed:hover {
+  opacity: 0.85;
 }
 
 .person-node__header {
