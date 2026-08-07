@@ -134,7 +134,10 @@ export function ChartView() {
     () => [...new Set((activeChart?.people ?? []).flatMap((person) => person.tags))].toSorted((a, b) => a.localeCompare(b)),
     [activeChart],
   );
-  const visiblePeople = useMemo(() => {
+  // People matching the current search/filters. Matching no longer hides the rest of the
+  // chart: non-matching people stay on the canvas, dimmed, so matches keep their org context
+  // (reporting lines stay intact instead of leaving disconnected floating pills).
+  const matchingPeople = useMemo(() => {
     const query = search.trim().toLowerCase();
     return (activeChart?.people ?? []).filter(
       (person) =>
@@ -148,6 +151,7 @@ export function ChartView() {
           person.department.toLowerCase().includes(query)),
     );
   }, [activeChart, managerFilter, search, sponsorFilter, tagFilter, hiddenPersonIds]);
+  const matchingIds = useMemo(() => new Set(matchingPeople.map((person) => person.id)), [matchingPeople]);
   const hiddenDescendantIds = useMemo(() => {
     const hidden = new Set<string>();
     for (const personId of collapsedIds) {
@@ -156,8 +160,11 @@ export function ChartView() {
     return hidden;
   }, [activeChart, collapsedIds]);
   const displayedPeople = useMemo(
-    () => visiblePeople.filter((person) => !hiddenDescendantIds.has(person.id)),
-    [hiddenDescendantIds, visiblePeople],
+    () =>
+      (activeChart?.people ?? []).filter(
+        (person) => !hiddenPersonIds.has(person.id) && !hiddenDescendantIds.has(person.id),
+      ),
+    [activeChart, hiddenPersonIds, hiddenDescendantIds],
   );
   const filtersActive = Boolean(sponsorFilter || managerFilter || tagFilter);
   const activeFilterCount = [sponsorFilter, managerFilter, tagFilter].filter(Boolean).length;
@@ -196,6 +203,7 @@ export function ChartView() {
         }),
         hasDirectReports: activeChart.people.some((report) => report.managerId === person.id),
         collapsed: collapsedIds.has(person.id),
+        dimmed: anyFilterActive && !matchingIds.has(person.id),
         onToggleCollapsed: handleToggleCollapsed,
         onEdit: handleEdit,
         onDelete: handleDelete,
@@ -203,11 +211,20 @@ export function ChartView() {
     }));
     const newEdges: Edge[] = displayedPeople
       .filter((person) => person.managerId && visibleIds.has(person.managerId))
-      .map((p) => ({ id: `${p.managerId}-${p.id}`, source: p.managerId as string, target: p.id }));
+      .map((p) => {
+        const dimmed =
+          anyFilterActive && (!matchingIds.has(p.id) || !matchingIds.has(p.managerId as string));
+        return {
+          id: `${p.managerId}-${p.id}`,
+          source: p.managerId as string,
+          target: p.id,
+          ...(dimmed ? { style: { opacity: 0.25 } } : {}),
+        };
+      });
     setNodes(newNodes);
     setEdges(newEdges);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeChart, displayedPeople, sponsorById, collapsedIds, handleToggleCollapsed, handleEdit, handleDelete]);
+  }, [activeChart, displayedPeople, sponsorById, collapsedIds, anyFilterActive, matchingIds, handleToggleCollapsed, handleEdit, handleDelete]);
 
   const onNodeDragStop: OnNodeDrag<Node<PersonNodeData>> = useCallback(
     (_event, node) => {
@@ -439,7 +456,9 @@ export function ChartView() {
           </select>
         </label>
         <span className="chart-filters__count" aria-live="polite">
-          {visiblePeople.length} of {activeChart.people.length} people
+          {anyFilterActive
+            ? `${matchingPeople.length} of ${activeChart.people.length} people match`
+            : `${activeChart.people.length} ${activeChart.people.length === 1 ? 'person' : 'people'}`}
         </span>
         <button
           type="button"
@@ -504,7 +523,7 @@ export function ChartView() {
             </button>
           </div>
         )}
-        {activeChart.people.length > 0 && anyFilterActive && visiblePeople.length === 0 && (
+        {activeChart.people.length > 0 && anyFilterActive && matchingPeople.length === 0 && (
           <div className="chart-canvas__empty">
             <strong>No people match these filters</strong>
             <button

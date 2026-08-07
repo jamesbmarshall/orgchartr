@@ -11,6 +11,9 @@ export interface PersonNodeData extends Record<string, unknown> {
   sponsors: Sponsor[];
   hasDirectReports: boolean;
   collapsed: boolean;
+  /** True when a search/filter is active and this person doesn't match: rendered faded so
+   * matches stand out while keeping their place in the org structure. */
+  dimmed: boolean;
   onToggleCollapsed: (personId: string) => void;
   onEdit: (person: Person) => void;
   onDelete: (person: Person) => void;
@@ -26,7 +29,7 @@ function initials(name: string): string {
 }
 
 export function PersonNode({ data }: NodeProps & { data: PersonNodeData }) {
-  const { person, sponsors, hasDirectReports, collapsed, onToggleCollapsed, onEdit, onDelete } = data;
+  const { person, sponsors, hasDirectReports, collapsed, dimmed, onToggleCollapsed, onEdit, onDelete } = data;
   const photo = photoUrl(person.photo);
   const backgroundColor = person.backgroundColor ?? 'var(--surface)';
   const edgeColor = person.edgeColor ?? 'var(--border)';
@@ -39,7 +42,7 @@ export function PersonNode({ data }: NodeProps & { data: PersonNodeData }) {
   } as CSSProperties;
 
   return (
-    <div className="person-node" style={nodeStyle}>
+    <div className={`person-node${dimmed ? ' person-node--dimmed' : ''}`} style={nodeStyle}>
       <Handle type="target" position={FlowPosition.Top} />
       <div className="person-node__header">
         {photo ? (
