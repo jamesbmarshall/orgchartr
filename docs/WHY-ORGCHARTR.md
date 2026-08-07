@@ -1,6 +1,6 @@
 # Why orgchartr?
 
-**In one line:** orgchartr is the lightweight way to keep *living* org charts of the **partner** organisations you work with, cross-linked to the Microsoft sponsors who own each relationship — with the data on your own machine, not in someone else's cloud.
+**In one line:** orgchartr is the lightweight way to keep *living* org charts of the **partner** organisations you work with, cross-linked to the sponsors who own each relationship — with the data on your own machine, not in someone else's cloud.
 
 If you've ever been asked "so what — why build this instead of using X?", this page is the answer.
 
@@ -31,4 +31,4 @@ orgchartr is intentionally small. It augments your notes and planning — it doe
 
 ## The one-sentence pitch, again
 
-> The only lightweight way to keep living org charts of *partner* organisations, cross-linked to the Microsoft sponsors who own each relationship — with the data on your own disk, not a third-party cloud.
+> The only lightweight way to keep living org charts of *partner* organisations, cross-linked to the sponsors who own each relationship — with the data on your own disk, not a third-party cloud.

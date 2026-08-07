@@ -64,11 +64,11 @@ export function Sponsors() {
   return (
     <div className="page">
       <div className="page__header">
-        <h1>Microsoft sponsors</h1>
+        <h1>Sponsors</h1>
         <Link to="/">Back to org charts</Link>
       </div>
       <p className="page__subtitle">
-        Shared directory of Microsoft employees you can link as sponsors on any partner org chart.
+        Shared directory of people you can link as sponsors on any org chart.
       </p>
 
       <button type="button" className="primary" onClick={() => setEditing('new')}>

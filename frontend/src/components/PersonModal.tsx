@@ -239,7 +239,7 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
             </select>
           </label>
           <label>
-            Microsoft sponsors
+            Sponsors
             <div className="tag-input">
               <input
                 value={sponsorInput}
@@ -250,14 +250,14 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
                     addSponsorName();
                   }
                 }}
-                list="microsoft-sponsors"
+                list="sponsor-options"
                 placeholder="Choose or type a sponsor"
               />
               <button type="button" onClick={addSponsorName}>
                 Add
               </button>
             </div>
-            <datalist id="microsoft-sponsors">
+            <datalist id="sponsor-options">
               {sponsorOptions.map((sponsor) => (
                 <option key={sponsor.id} value={sponsor.name}>
                   {sponsor.title}

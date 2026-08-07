@@ -122,7 +122,7 @@ export function Dashboard() {
       <div className="page__header">
         <h1>Org charts</h1>
         <Link to="/sponsors" className="button-link">
-          Manage Microsoft sponsors
+          Manage sponsors
         </Link>
       </div>
 

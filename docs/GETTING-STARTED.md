@@ -67,12 +67,12 @@ You'll see the orgchartr dashboard. It's empty for now — let's fix that.
 
 Add a few more people, setting each one's manager, and orgchartr arranges them into a tidy tree. You can also drag a line from the bottom of one person's card to another to set who reports to whom.
 
-## Step 8 — Link a Microsoft sponsor
+## Step 8 — Link a sponsor
 
-A **sponsor** is the Microsoft person who owns the relationship with someone on the chart. Sponsors live in a shared directory so you can reuse them across every chart.
+A **sponsor** is anyone who owns or supports the relationship with someone on the chart. Sponsors live in a shared directory so you can reuse them across every chart.
 
 1. Edit a person (the pencil icon on their card).
-2. In the **Microsoft sponsors** box, start typing a name. If they already exist, pick them; if not, type the full name and it's created for you when you save.
+2. In the **Sponsors** box, start typing a name. If they already exist, pick them; if not, type the full name and it's created for you when you save.
 3. Save. The person's card now shows who sponsors them, and you can filter a chart by sponsor to see everyone one person covers.
 
 ## Step 9 — Put it in a slide

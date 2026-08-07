@@ -1,14 +1,14 @@
 # orgchartr
 
-**Living org charts of the partner organisations you work with, cross-linked to the Microsoft sponsors who own each relationship — running on your own machine, with the data in a folder you choose.**
+**Living org charts of the partner organisations you work with, cross-linked to the sponsors who own each relationship — running on your own machine, with the data in a folder you choose.**
 
-orgchartr is for anyone leading through partners or stakeholders who needs to *see* — at a glance — who is who in a partner's organisation, who reports to whom, and which Microsoft sponsor covers each person. It's built to take the mental load off remembering all of that, and to let a virtual team share one clear picture. Charts export cleanly into PowerPoint, so they slot straight into your notes and planning.
+orgchartr is for anyone leading through partners or stakeholders who needs to *see* — at a glance — who is who in a partner's organisation, who reports to whom, and which sponsor covers each person. It's built to take the mental load off remembering all of that, and to let a virtual team share one clear picture. Charts export cleanly into PowerPoint, so they slot straight into your notes and planning.
 
 New here? Start with the plain-English [**Getting started guide**](docs/GETTING-STARTED.md). Wondering why this over PowerPoint, Excel, or a CRM? See [**Why orgchartr?**](docs/WHY-ORGCHARTR.md).
 
 - One org chart per partner (or team) — add, edit, and remove people, and draw the reporting lines between them.
-- Each person carries a title, department, tags, a photo, free-text **notes** (decisions they own, how they like to be contacted, anything worth remembering), and links to one or more Microsoft sponsors.
-- A shared, reusable directory of Microsoft employees ("sponsors") you can link to any person on any chart.
+- Each person carries a title, department, tags, a photo, free-text **notes** (decisions they own, how they like to be contacted, anything worth remembering), and links to one or more sponsors.
+- A shared, reusable sponsor directory you can link to any person on any chart.
 - Export a whole chart, or chosen branches and people, as SVG, PNG, CSV, or JSON.
 - Runs locally in Docker with no cloud hosting and no accounts to create.
 - Stores its data in a folder you choose. The app never uploads, syncs, or backs up that folder for you.
@@ -86,7 +86,7 @@ The data folder contains:
 - `charts/index.json` — the list of charts shown on the dashboard
 - `charts/{chartId}.json` — one file per org chart (people, reporting lines, notes, tags, sponsor links)
 - `charts/history/` — recent automatic snapshots you can restore from
-- `sponsors.json` — the shared Microsoft sponsor directory
+- `sponsors.json` — the shared sponsor directory
 - `assets/photos/` — uploaded photos
 
 It's plain JSON and images — nothing proprietary. You can read it, copy it, or back it up like any other folder.

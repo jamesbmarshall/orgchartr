@@ -58,7 +58,7 @@ export function PersonNode({ data }: NodeProps & { data: PersonNodeData }) {
       </div>
 
       {sponsors.length > 0 && (
-        <div className="person-node__sponsor" title={`Microsoft sponsors: ${sponsors.map((sponsor) => sponsor.name).join(', ')}`}>
+        <div className="person-node__sponsor" title={`Sponsors: ${sponsors.map((sponsor) => sponsor.name).join(', ')}`}>
           🎗️ {sponsors.map((sponsor) => sponsor.name).join(', ')}
         </div>
       )}

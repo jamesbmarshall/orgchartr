@@ -69,7 +69,7 @@ export function SponsorModal({ sponsor, onSave, onClose }: SponsorModalProps) {
   return (
     <div className="modal-overlay" ref={overlayRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="sponsor-modal-title">
       <div className="modal">
-        <h2 id="sponsor-modal-title">{sponsor ? 'Edit sponsor' : 'Add Microsoft sponsor'}</h2>
+        <h2 id="sponsor-modal-title">{sponsor ? 'Edit sponsor' : 'Add sponsor'}</h2>
         {sponsor && (sponsor.createdAt || sponsor.updatedAt) && (
           <p className="timestamp-note">
             {sponsor.createdAt && `Added ${new Date(sponsor.createdAt).toLocaleString()}`}
