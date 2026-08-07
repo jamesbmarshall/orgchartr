@@ -15,6 +15,7 @@ import {
 } from '../utils/exportChart';
 
 type Scope = 'all' | 'selection';
+type ImageStyle = 'framed' | 'clean';
 
 interface ExportModalProps {
   chartId: string;
@@ -30,6 +31,9 @@ export function ExportModal({ chartId, partnerName, people, sponsors, onClose }:
   const [includeDescendants, setIncludeDescendants] = useState(true);
   const [includeAncestors, setIncludeAncestors] = useState(false);
   const [format, setFormat] = useState<ExportFormat>('svg');
+  const [imageStyle, setImageStyle] = useState<ImageStyle>('framed');
+  const [preparedBy, setPreparedBy] = useState('');
+  const [revision, setRevision] = useState('01');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const overlayRef = useModalDialog(() => {
@@ -99,7 +103,13 @@ export function ExportModal({ chartId, partnerName, people, sponsors, onClose }:
         const blob = await api.exportChartPackage(chartId, exportPeople.map((person) => person.id));
         downloadBlob(blob, `${base}.orgchartr.zip`);
       } else {
-        const svg = await buildSvg(exportPeople, { title: partnerName, sponsorById });
+        const svg = await buildSvg(exportPeople, {
+          title: partnerName,
+          sponsorById,
+          preparedBy,
+          revision,
+          framed: imageStyle === 'framed',
+        });
         if (format === 'svg') {
           downloadBlob(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }), `${base}.svg`);
         } else {
@@ -185,6 +195,52 @@ export function ExportModal({ chartId, partnerName, people, sponsors, onClose }:
           ))}
         </fieldset>
         {activeFormat && <p className="export-hint">{activeFormat.hint}</p>}
+
+        {(format === 'svg' || format === 'png') && (
+          <fieldset className="export-scope">
+            <legend>Image style</legend>
+            <label>
+              <input
+                type="radio"
+                name="image-style"
+                checked={imageStyle === 'framed'}
+                onChange={() => setImageStyle('framed')}
+              />
+              Framed drawing
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="image-style"
+                checked={imageStyle === 'clean'}
+                onChange={() => setImageStyle('clean')}
+              />
+              Clean sheet
+            </label>
+          </fieldset>
+        )}
+
+        {(format === 'svg' || format === 'png') && imageStyle === 'framed' && (
+          <fieldset className="export-scope">
+            <legend>Drawing details</legend>
+            <div className="export-details">
+              <label>
+                Prepared by
+                <input
+                  value={preparedBy}
+                  onChange={(event) => setPreparedBy(event.target.value)}
+                  placeholder="Your name or team"
+                  maxLength={40}
+                />
+              </label>
+              <label>
+                Revision
+                <input value={revision} onChange={(event) => setRevision(event.target.value)} maxLength={12} />
+              </label>
+            </div>
+            <p className="export-hint">The chart name and export time are added automatically.</p>
+          </fieldset>
+        )}
 
         <p className="export-hint">
           {exportPeople.length} {exportPeople.length === 1 ? 'person' : 'people'} will be exported.

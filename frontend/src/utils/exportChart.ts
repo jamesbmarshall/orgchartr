@@ -21,6 +21,10 @@ const PNG_SCALE = 2;
 const MARGIN = 40;
 const TITLE_HEIGHT = 56;
 const LEGEND_ROW_HEIGHT = 24;
+const FRAME_INSET = 16;
+const TITLE_BLOCK_WIDTH = 360;
+const TITLE_BLOCK_HEIGHT = 112;
+const FOOTER_GAP = 24;
 
 function escapeXml(value: string): string {
   return value
@@ -76,10 +80,65 @@ async function loadPhotos(people: Person[]): Promise<Map<string, string>> {
 interface SvgOptions {
   title: string;
   sponsorById: Map<string, Sponsor>;
+  preparedBy?: string;
+  revision?: string;
+  framed?: boolean;
+}
+
+function formatExportDate(date: Date): string {
+  return `${date.toISOString().slice(0, 10)} ${date.toISOString().slice(11, 16)} UTC`;
+}
+
+function buildDrawingFrame(width: number, height: number): string {
+  const horizontalZones = ['A', 'B', 'C', 'D'];
+  const verticalZones = ['1', '2', '3'];
+  const left = FRAME_INSET;
+  const top = FRAME_INSET;
+  const right = width - FRAME_INSET;
+  const bottom = height - FRAME_INSET;
+
+  return `<g fill="#52606d" font-size="7" text-anchor="middle">
+    <rect x="${left}" y="${top}" width="${right - left}" height="${bottom - top}" fill="none" stroke="#34404c" stroke-width="1.5" />
+    ${horizontalZones.map((zone, index) => {
+      const x = left + ((index + 0.5) * (right - left)) / horizontalZones.length;
+      return `<text x="${x}" y="${top - 4}">${zone}</text><text x="${x}" y="${bottom + 10}">${zone}</text>`;
+    }).join('')}
+    ${verticalZones.map((zone, index) => {
+      const y = top + ((index + 0.5) * (bottom - top)) / verticalZones.length;
+      return `<text x="${left - 7}" y="${y + 2}">${zone}</text><text x="${right + 7}" y="${y + 2}">${zone}</text>`;
+    }).join('')}
+    <path d="M ${width / 2} ${top} v 6 M ${width / 2} ${bottom} v -6 M ${left} ${height / 2} h 6 M ${right} ${height / 2} h -6" fill="none" stroke="#34404c" stroke-width="1" />
+  </g>`;
+}
+
+function buildTitleBlock(width: number, height: number, title: string, preparedBy: string, revision: string): string {
+  const left = width - FRAME_INSET - TITLE_BLOCK_WIDTH;
+  const top = height - FRAME_INSET - TITLE_BLOCK_HEIGHT;
+  const detailsLeft = left + 230;
+  const bottomRowTop = top + 76;
+
+  return `<g>
+    <rect x="${left}" y="${top}" width="${TITLE_BLOCK_WIDTH}" height="${TITLE_BLOCK_HEIGHT}" fill="#f8fafc" stroke="#34404c" stroke-width="1.5" />
+    <path d="M ${detailsLeft} ${top} V ${top + TITLE_BLOCK_HEIGHT} M ${detailsLeft} ${top + 38} H ${left + TITLE_BLOCK_WIDTH} M ${detailsLeft} ${bottomRowTop} H ${left + TITLE_BLOCK_WIDTH} M ${detailsLeft + 65} ${bottomRowTop} V ${top + TITLE_BLOCK_HEIGHT}" fill="none" stroke="#34404c" stroke-width="1" />
+    <text x="${left + 12}" y="${top + 18}" font-size="8" font-weight="600" fill="#65717e">ORGANISATION CHART</text>
+    <text x="${left + 12}" y="${top + 42}" font-size="17" font-weight="700" fill="#17212b">${escapeXml(truncate(title, 28))}</text>
+    <text x="${left + 12}" y="${top + 95}" font-size="9" font-weight="700" fill="#34404c">ORGCHARTR</text>
+    <text x="${detailsLeft + 8}" y="${top + 13}" font-size="7" font-weight="600" fill="#65717e">EXPORTED</text>
+    <text x="${detailsLeft + 8}" y="${top + 29}" font-size="9" fill="#17212b">${formatExportDate(new Date())}</text>
+    <text x="${detailsLeft + 8}" y="${top + 51}" font-size="7" font-weight="600" fill="#65717e">PREPARED BY</text>
+    <text x="${detailsLeft + 8}" y="${top + 68}" font-size="9" fill="#17212b">${escapeXml(truncate(preparedBy || 'Not specified', 20))}</text>
+    <text x="${detailsLeft + 8}" y="${bottomRowTop + 13}" font-size="7" font-weight="600" fill="#65717e">REVISION</text>
+    <text x="${detailsLeft + 8}" y="${bottomRowTop + 29}" font-size="10" font-weight="700" fill="#17212b">${escapeXml(truncate(revision || '01', 8))}</text>
+    <text x="${detailsLeft + 73}" y="${bottomRowTop + 13}" font-size="7" font-weight="600" fill="#65717e">SHEET</text>
+    <text x="${detailsLeft + 73}" y="${bottomRowTop + 29}" font-size="10" font-weight="700" fill="#17212b">1 / 1</text>
+  </g>`;
 }
 
 /** Renders the given people as a standalone, light-themed SVG suitable for PowerPoint. */
-export async function buildSvg(people: Person[], { title, sponsorById }: SvgOptions): Promise<string> {
+export async function buildSvg(
+  people: Person[],
+  { title, sponsorById, preparedBy = '', revision = '01', framed = true }: SvgOptions,
+): Promise<string> {
   if (people.length === 0) throw new Error('Nothing to export — select at least one person.');
 
   const positions = computeAutoLayout(people, true);
@@ -97,9 +156,22 @@ export async function buildSvg(people: Person[], { title, sponsorById }: SvgOpti
   const offsetY = MARGIN + TITLE_HEIGHT - minY;
   const legendEntries = colorLegendEntries(people);
   const legendHeight = legendEntries.length > 0 ? 34 + legendEntries.length * LEGEND_ROW_HEIGHT : 0;
-  const width = Math.max(maxX - minX + MARGIN * 2, 320);
+  const legendWidth = legendEntries.length > 0
+    ? Math.max(...legendEntries.map((entry) => entry.label.length * 6.5 + 40))
+    : 0;
+  const framedFooterWidth = legendEntries.length > 0
+    ? MARGIN + legendWidth + FOOTER_GAP + TITLE_BLOCK_WIDTH + FRAME_INSET
+    : FRAME_INSET * 2 + TITLE_BLOCK_WIDTH;
+  const cleanFooterWidth = legendEntries.length > 0 ? MARGIN * 2 + legendWidth : 320;
+  const width = Math.max(
+    maxX - minX + MARGIN * 2,
+    framed ? framedFooterWidth : cleanFooterWidth,
+  );
   const chartHeight = maxY - minY + MARGIN * 2 + TITLE_HEIGHT;
-  const height = chartHeight + legendHeight;
+  const framedFooterHeight = Math.max(TITLE_BLOCK_HEIGHT, legendHeight + 10);
+  const height = framed
+    ? chartHeight + framedFooterHeight + FRAME_INSET
+    : chartHeight + legendHeight;
 
   const photos = await loadPhotos(people);
 
@@ -177,7 +249,7 @@ export async function buildSvg(people: Person[], { title, sponsorById }: SvgOpti
     .join('\n    ');
 
   const legend = legendEntries.length > 0
-    ? `<g transform="translate(${MARGIN} ${chartHeight - 8})">
+    ? `<g transform="translate(${MARGIN} ${framed ? chartHeight + 10 : chartHeight - 8})">
       <text x="0" y="0" font-size="13" font-weight="600" fill="#1a1d24">Colour key</text>
       ${legendEntries.map((entry, index) => {
         const rowY = 12 + index * LEGEND_ROW_HEIGHT;
@@ -191,6 +263,7 @@ export async function buildSvg(people: Person[], { title, sponsorById }: SvgOpti
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="Segoe UI, Helvetica, Arial, sans-serif">
   <rect width="${width}" height="${height}" fill="#ffffff" />
+  ${framed ? buildDrawingFrame(width, height) : ''}
   <text x="${MARGIN}" y="${MARGIN}" font-size="20" font-weight="600" fill="#1a1d24">${escapeXml(title)}</text>
   <g>
     ${edges}
@@ -199,6 +272,7 @@ export async function buildSvg(people: Person[], { title, sponsorById }: SvgOpti
     ${nodes}
   </g>
   ${legend}
+  ${framed ? buildTitleBlock(width, height, title, preparedBy, revision) : ''}
 </svg>`;
 }
 
