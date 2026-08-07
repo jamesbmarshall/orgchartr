@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- Stage 1: build frontend + server ----
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -14,7 +14,7 @@ COPY server ./server
 RUN npm run build
 
 # ---- Stage 2: production runtime ----
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -30,5 +30,14 @@ ENV DATA_DIR=/app/data
 ENV FRONTEND_DIST=/app/frontend/dist
 
 EXPOSE 3000
+
+# Run as the unprivileged `node` user (uid 1000) shipped with the base image rather than root.
+# The bind-mounted host data directory must be writable by uid 1000 (on Docker Desktop this is
+# automatic; on a Linux host, `chown 1000:1000` the data directory or make it group-writable).
+USER node
+
+# Report unhealthy if the API is down or the data directory isn't writable.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
 CMD ["node", "server/dist/index.js"]

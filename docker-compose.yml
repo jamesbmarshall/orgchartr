@@ -4,7 +4,11 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - '3000:3000'
+      # Bind to localhost only: orgchartr has no authentication, so the app must not be reachable
+      # from other machines on the network. To deliberately expose it on the LAN, change this to
+      # "3000:3000" (and understand that anyone who can reach the port has full, unauthenticated
+      # access to all stakeholder data).
+      - '127.0.0.1:3000:3000'
     volumes:
       - type: bind
         source: ${ORGCHARTR_DATA_DIR:-./data}

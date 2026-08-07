@@ -10,8 +10,16 @@ import {
   computeSponsorUsage,
 } from '../lib/dataStore';
 import type { Sponsor } from '../types';
+import { isStoredPhotoName } from '../lib/images';
+import { ValidationError, requireNonEmptyString, requireString, requireStringArray } from '../lib/validation';
 
 const router = Router();
+
+function parsePhotoField(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (!isStoredPhotoName(value)) throw new ValidationError('photo must be a valid uploaded photo reference');
+  return value;
+}
 
 router.get('/', (_req, res) => {
   res.json(loadSponsors());
@@ -24,21 +32,24 @@ router.get('/usage', (_req, res) => {
 
 router.post('/', (req, res) => {
   const { name, title, department, photo, tags } = req.body ?? {};
-  if (!name || typeof name !== 'string' || !name.trim()) {
-    return res.status(400).json({ error: 'name is required' });
-  }
   const sponsors = loadSponsors();
   const now = new Date().toISOString();
-  const sponsor: Sponsor = {
-    id: nanoid(10),
-    name: name.trim(),
-    title: title ?? '',
-    department: department ?? '',
-    photo: photo ?? null,
-    tags: Array.isArray(tags) ? tags : [],
-    createdAt: now,
-    updatedAt: now,
-  };
+  let sponsor: Sponsor;
+  try {
+    sponsor = {
+      id: nanoid(10),
+      name: requireNonEmptyString(name, 'name'),
+      title: title === undefined ? '' : requireString(title, 'title'),
+      department: department === undefined ? '' : requireString(department, 'department'),
+      photo: parsePhotoField(photo),
+      tags: tags === undefined ? [] : requireStringArray(tags, 'tags'),
+      createdAt: now,
+      updatedAt: now,
+    };
+  } catch (err) {
+    if (err instanceof ValidationError) return res.status(400).json({ error: err.message });
+    throw err;
+  }
   sponsors.push(sponsor);
   saveSponsors(sponsors);
   res.status(201).json(sponsor);
@@ -50,11 +61,16 @@ router.put('/:id', (req, res) => {
   if (!sponsor) return res.status(404).json({ error: 'Sponsor not found' });
 
   const { name, title, department, photo, tags } = req.body ?? {};
-  if (name !== undefined) sponsor.name = name;
-  if (title !== undefined) sponsor.title = title;
-  if (department !== undefined) sponsor.department = department;
-  if (photo !== undefined) sponsor.photo = photo;
-  if (tags !== undefined) sponsor.tags = Array.isArray(tags) ? tags : sponsor.tags;
+  try {
+    if (name !== undefined) sponsor.name = requireNonEmptyString(name, 'name');
+    if (title !== undefined) sponsor.title = requireString(title, 'title');
+    if (department !== undefined) sponsor.department = requireString(department, 'department');
+    if (photo !== undefined) sponsor.photo = parsePhotoField(photo);
+    if (tags !== undefined) sponsor.tags = requireStringArray(tags, 'tags');
+  } catch (err) {
+    if (err instanceof ValidationError) return res.status(400).json({ error: err.message });
+    throw err;
+  }
   sponsor.updatedAt = new Date().toISOString();
 
   saveSponsors(sponsors);
