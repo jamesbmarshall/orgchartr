@@ -121,7 +121,14 @@ export function SponsorModal({ sponsor, onSave, onClose }: SponsorModalProps) {
             <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handlePhotoChange} />
           </label>
           {uploading && <p>Uploading photo…</p>}
-          {photoPreview && <img className="modal__photo-preview" src={photoPreview} alt="Preview" />}
+          {photoPreview && (
+            <div className="modal__photo-row">
+              <img className="modal__photo-preview" src={photoPreview} alt="Preview" />
+              <button type="button" onClick={() => setPhoto(null)}>
+                Remove photo
+              </button>
+            </div>
+          )}
 
           {error && <p className="error-text">{error}</p>}
 
