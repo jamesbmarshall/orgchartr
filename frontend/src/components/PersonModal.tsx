@@ -5,6 +5,7 @@ import { getDescendantIds } from '../utils/orgTree';
 import { colorLegendEntries, colorSchemeKey, readableTextColor } from '../utils/personColors';
 import { comparePeopleBySurname } from '../utils/personNames';
 import { api, photoUrl } from '../api/client';
+import { useModalDialog } from '../hooks/useModalDialog';
 
 interface PersonModalProps {
   people: Person[];
@@ -53,6 +54,9 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const overlayRef = useModalDialog(() => {
+    if (!saving) onClose();
+  });
 
   const excludedManagerIds = person ? new Set([person.id, ...getDescendantIds(people, person.id)]) : new Set<string>();
   const managerOptions = people.filter((p) => !excludedManagerIds.has(p.id)).toSorted(comparePeopleBySurname);
@@ -190,7 +194,7 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
   const photoPreview = photoUrl(photo);
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="person-modal-title">
+    <div className="modal-overlay" ref={overlayRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="person-modal-title">
       <div className="modal">
         <h2 id="person-modal-title">{person ? 'Edit person' : 'Add person'}</h2>
         {person && (person.createdAt || person.updatedAt) && (

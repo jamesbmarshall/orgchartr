@@ -1,6 +1,7 @@
 import { useState, type ChangeEvent } from 'react';
 import type { Person, Sponsor } from '../types';
 import { parseCsv } from '../utils/csv';
+import { useModalDialog } from '../hooks/useModalDialog';
 
 interface ImportModalProps {
   people: Person[];
@@ -80,6 +81,9 @@ export function ImportModal({ people, sponsors, onAddPerson, onUpdatePerson, onC
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
+  const overlayRef = useModalDialog(() => {
+    if (!importing) onClose();
+  });
 
   async function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -172,7 +176,7 @@ export function ImportModal({ people, sponsors, onAddPerson, onUpdatePerson, onC
   }
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
+    <div className="modal-overlay" ref={overlayRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
       <div className="modal">
         <h2 id="import-modal-title">Import people from CSV</h2>
         <p className="export-hint">
