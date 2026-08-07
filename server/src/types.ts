@@ -10,6 +10,8 @@ export interface Person {
   edgeColor: string | null;
   backgroundColor: string | null;
   colorLabel: string;
+  /** Free-text notes about this person. Empty string if never set. */
+  notes: string;
   position: { x: number; y: number } | null;
   /** ISO timestamps. Null for records created before this field existed. */
   createdAt: string | null;

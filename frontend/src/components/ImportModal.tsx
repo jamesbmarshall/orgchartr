@@ -18,6 +18,7 @@ interface ImportRow {
   manager: string;
   sponsorNames: string[];
   tags: string[];
+  notes: string;
   colorLabel: string;
   edgeColor: string;
   backgroundColor: string;
@@ -36,6 +37,7 @@ function parseRows(text: string): ImportRow[] {
   const managerIdx = col('Manager');
   const sponsorsIdx = col('Sponsors');
   const tagsIdx = col('Tags');
+  const notesIdx = col('Notes');
   const colorLabelIdx = col('Colour label');
   const edgeColorIdx = col('Edge colour');
   const backgroundColorIdx = col('Background colour');
@@ -56,6 +58,7 @@ function parseRows(text: string): ImportRow[] {
         .split(';')
         .map((t) => t.trim())
         .filter(Boolean),
+      notes: cell(row, notesIdx),
       colorLabel: cell(row, colorLabelIdx),
       edgeColor: cell(row, edgeColorIdx),
       backgroundColor: cell(row, backgroundColorIdx),
@@ -65,7 +68,7 @@ function parseRows(text: string): ImportRow[] {
 
 /**
  * Bulk-imports people from a CSV file matching the app's own export format
- * (Name, Title, Department, Manager, Sponsors, Tags, Colour label, Edge colour, Background colour).
+ * (Name, Title, Department, Manager, Sponsors, Tags, Notes, Colour label, Edge colour, Background colour).
  * Sponsors named in the file are matched case-insensitively against the existing directory, or created.
  * Manager is resolved by name, preferring other rows in the same file, then existing chart people -
  * the same limitation the CSV export already has when a manager falls outside the exported scope.
@@ -128,6 +131,7 @@ export function ImportModal({ people, sponsors, onAddPerson, onUpdatePerson, onC
           department: row.department,
           sponsorIds,
           tags: row.tags,
+          notes: row.notes,
           colorLabel: row.colorLabel,
           edgeColor: HEX_COLOR.test(row.edgeColor) ? row.edgeColor : null,
           backgroundColor: HEX_COLOR.test(row.backgroundColor) ? row.backgroundColor : null,
@@ -172,8 +176,8 @@ export function ImportModal({ people, sponsors, onAddPerson, onUpdatePerson, onC
       <div className="modal">
         <h2 id="import-modal-title">Import people from CSV</h2>
         <p className="export-hint">
-          Upload a CSV file matching the export format: Name, Title, Department, Manager, Sponsors, Tags, Colour
-          label, Edge colour, Background colour. Sponsors and Tags may list multiple values separated by semicolons.
+          Upload a CSV file matching the export format: Name, Title, Department, Manager, Sponsors, Tags, Notes,
+          Colour label, Edge colour, Background colour. Sponsors and Tags may list multiple values separated by semicolons.
           Manager is matched by name against people already in this chart or elsewhere in the file.
         </p>
 

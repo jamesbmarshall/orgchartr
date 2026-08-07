@@ -122,6 +122,7 @@ function parsePerson(value: unknown): Person {
     edgeColor: nullableColor(value.edgeColor),
     backgroundColor: nullableColor(value.backgroundColor),
     colorLabel: typeof value.colorLabel === 'string' ? value.colorLabel : '',
+    notes: typeof value.notes === 'string' ? value.notes.slice(0, 4000) : '',
     position,
     createdAt: nullableTimestamp(value.createdAt),
     updatedAt: nullableTimestamp(value.updatedAt),

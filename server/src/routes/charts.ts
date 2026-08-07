@@ -33,6 +33,13 @@ function parseColorField(value: unknown): string | null {
   return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : null;
 }
 
+/** Bound stored free-text notes so a bad client can't bloat chart files. */
+const MAX_NOTES_LENGTH = 4000;
+
+function parseNotesField(value: unknown): string {
+  return typeof value === 'string' ? value.trim().slice(0, MAX_NOTES_LENGTH) : '';
+}
+
 // GET /api/charts - index of all charts
 router.get('/', (_req, res) => {
   res.json(readIndex());
@@ -132,7 +139,7 @@ router.post('/:id/people', (req, res) => {
   const chart = loadChart(req.params.id);
   if (!chart) return res.status(404).json({ error: 'Chart not found' });
 
-  const { name, title, department, photo, managerId, sponsorIds, tags, edgeColor, backgroundColor, colorLabel } = req.body ?? {};
+  const { name, title, department, photo, managerId, sponsorIds, tags, edgeColor, backgroundColor, colorLabel, notes } = req.body ?? {};
   if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'name is required' });
   }
@@ -153,6 +160,7 @@ router.post('/:id/people', (req, res) => {
     edgeColor: parseColorField(edgeColor),
     backgroundColor: parseColorField(backgroundColor),
     colorLabel: typeof colorLabel === 'string' ? colorLabel.trim() : '',
+    notes: parseNotesField(notes),
     position: null,
     createdAt: now,
     updatedAt: now,
@@ -169,7 +177,7 @@ router.put('/:id/people/:personId', (req, res) => {
   const person = chart.people.find((p) => p.id === req.params.personId);
   if (!person) return res.status(404).json({ error: 'Person not found' });
 
-  const { name, title, department, photo, managerId, sponsorIds, tags, edgeColor, backgroundColor, colorLabel, position } = req.body ?? {};
+  const { name, title, department, photo, managerId, sponsorIds, tags, edgeColor, backgroundColor, colorLabel, notes, position } = req.body ?? {};
 
   if (managerId !== undefined) {
     if (managerId !== null) {
@@ -193,6 +201,7 @@ router.put('/:id/people/:personId', (req, res) => {
   if (edgeColor !== undefined) person.edgeColor = parseColorField(edgeColor);
   if (backgroundColor !== undefined) person.backgroundColor = parseColorField(backgroundColor);
   if (colorLabel !== undefined && typeof colorLabel === 'string') person.colorLabel = colorLabel.trim();
+  if (notes !== undefined) person.notes = parseNotesField(notes);
   if (position !== undefined) person.position = position;
   person.updatedAt = new Date().toISOString();
 

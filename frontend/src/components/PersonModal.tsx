@@ -38,6 +38,7 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
   const [draggedSponsorName, setDraggedSponsorName] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>(person?.tags ?? []);
   const [tagInput, setTagInput] = useState('');
+  const [notes, setNotes] = useState(person?.notes ?? '');
   const [photo, setPhoto] = useState<string | null>(person?.photo ?? null);
   const [useColorCoding, setUseColorCoding] = useState(
     Boolean(person?.edgeColor || person?.backgroundColor || person?.colorLabel),
@@ -174,6 +175,7 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
         managerId: managerId || null,
         sponsorIds: selectedSponsors.map((sponsor) => sponsor.id),
         tags,
+        notes: notes.trim(),
         photo,
         edgeColor: useColorCoding ? edgeColor : null,
         backgroundColor: useColorCoding && useCustomBackground ? backgroundColor : null,
@@ -313,6 +315,16 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
                 </span>
               ))}
             </div>
+          </label>
+          <label>
+            Notes
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Key facts worth remembering — decisions they own, preferences, recent conversations…"
+              rows={3}
+              maxLength={4000}
+            />
           </label>
           <fieldset className="person-colors">
             <legend>Colour coding</legend>

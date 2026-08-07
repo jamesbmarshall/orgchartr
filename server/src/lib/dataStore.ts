@@ -55,12 +55,13 @@ export function listChartIds(): string[] {
   return readIndex().map((entry) => entry.id);
 }
 
-type StoredPerson = Omit<Person, 'sponsorIds' | 'createdAt' | 'updatedAt'> & {
+type StoredPerson = Omit<Person, 'sponsorIds' | 'notes' | 'createdAt' | 'updatedAt'> & {
   sponsorIds?: string[];
   sponsorId?: string | null;
   edgeColor?: string | null;
   backgroundColor?: string | null;
   colorLabel?: string;
+  notes?: string;
   createdAt?: string | null;
   updatedAt?: string | null;
 };
@@ -91,6 +92,7 @@ export function loadChart(id: string): Chart | null {
         ? null
         : parseColor(person.backgroundColor),
       colorLabel: typeof person.colorLabel === 'string' ? person.colorLabel : '',
+      notes: typeof person.notes === 'string' ? person.notes : '',
       createdAt: typeof person.createdAt === 'string' ? person.createdAt : null,
       updatedAt: typeof person.updatedAt === 'string' ? person.updatedAt : null,
     })),
