@@ -39,7 +39,26 @@ export function writeJsonAtomic(filePath: string, data: unknown): void {
   fs.renameSync(tmpPath, filePath);
 }
 
+/**
+ * Chart IDs are produced by slugify() + optional nanoid suffix, so they only ever contain
+ * lowercase letters, digits, and hyphens. Enforcing that shape keeps a request-supplied id from
+ * ever escaping CHARTS_DIR via path segments like "../" or absolute/Windows paths.
+ */
+const CHART_ID_PATTERN = /^[a-z0-9-]+$/;
+
+export function isValidChartId(id: unknown): id is string {
+  return typeof id === 'string' && CHART_ID_PATTERN.test(id) && id === path.basename(id);
+}
+
+/** Backstop for the filesystem helpers: refuses any id that isn't a plain chart-id segment. */
+function assertValidChartId(id: string): void {
+  if (!isValidChartId(id)) {
+    throw new Error(`Invalid chart id: ${id}`);
+  }
+}
+
 export function chartFilePath(id: string): string {
+  assertValidChartId(id);
   return path.join(CHARTS_DIR, `${id}.json`);
 }
 
@@ -106,6 +125,7 @@ const SNAPSHOT_MIN_INTERVAL_MS = 5 * 60 * 1000;
 const MAX_HISTORY_SNAPSHOTS = 30;
 
 function chartHistoryDir(id: string): string {
+  assertValidChartId(id);
   return path.join(CHART_HISTORY_DIR, id);
 }
 

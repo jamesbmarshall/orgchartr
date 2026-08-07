@@ -8,10 +8,26 @@ import {
   garbageCollectPhotos,
   listChartHistory,
   restoreChartFromHistory,
+  isValidChartId,
 } from '../lib/dataStore';
 import type { Chart, Person } from '../types';
+import { isStoredPhotoName } from '../lib/images';
+import { ValidationError, requireNonEmptyString, requireString, requireStringArray, requirePosition } from '../lib/validation';
 
 const router = Router();
+
+/** null (photo cleared) or a safe stored photo filename; anything else is rejected. */
+function parsePhotoField(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (!isStoredPhotoName(value)) throw new ValidationError('photo must be a valid uploaded photo reference');
+  return value;
+}
+
+// Reject any chart id that isn't a plain slug/nanoid segment before it reaches the filesystem.
+router.param('id', (_req, res, next, id) => {
+  if (!isValidChartId(id)) return res.status(400).json({ error: 'Invalid chart id' });
+  next();
+});
 
 function slugify(name: string): string {
   const base = name
@@ -140,31 +156,34 @@ router.post('/:id/people', (req, res) => {
   if (!chart) return res.status(404).json({ error: 'Chart not found' });
 
   const { name, title, department, photo, managerId, sponsorIds, tags, edgeColor, backgroundColor, colorLabel, notes } = req.body ?? {};
-  if (!name || typeof name !== 'string' || !name.trim()) {
-    return res.status(400).json({ error: 'name is required' });
-  }
   if (managerId && !chart.people.some((p) => p.id === managerId)) {
     return res.status(400).json({ error: 'managerId does not exist in this chart' });
   }
 
-  const now = new Date().toISOString();
-  const person: Person = {
-    id: nanoid(10),
-    name: name.trim(),
-    title: title ?? '',
-    department: department ?? '',
-    photo: photo ?? null,
-    managerId: managerId ?? null,
-    sponsorIds: Array.isArray(sponsorIds) ? sponsorIds.filter((id): id is string => typeof id === 'string') : [],
-    tags: Array.isArray(tags) ? tags : [],
-    edgeColor: parseColorField(edgeColor),
-    backgroundColor: parseColorField(backgroundColor),
-    colorLabel: typeof colorLabel === 'string' ? colorLabel.trim() : '',
-    notes: parseNotesField(notes),
-    position: null,
-    createdAt: now,
-    updatedAt: now,
-  };
+  let person: Person;
+  try {
+    const now = new Date().toISOString();
+    person = {
+      id: nanoid(10),
+      name: requireNonEmptyString(name, 'name'),
+      title: title === undefined ? '' : requireString(title, 'title'),
+      department: department === undefined ? '' : requireString(department, 'department'),
+      photo: parsePhotoField(photo),
+      managerId: managerId ?? null,
+      sponsorIds: sponsorIds === undefined ? [] : requireStringArray(sponsorIds, 'sponsorIds'),
+      tags: tags === undefined ? [] : requireStringArray(tags, 'tags'),
+      edgeColor: parseColorField(edgeColor),
+      backgroundColor: parseColorField(backgroundColor),
+      colorLabel: typeof colorLabel === 'string' ? colorLabel.trim() : '',
+      notes: parseNotesField(notes),
+      position: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+  } catch (err) {
+    if (err instanceof ValidationError) return res.status(400).json({ error: err.message });
+    throw err;
+  }
   chart.people.push(person);
   saveChart(chart);
   res.status(201).json(person);
@@ -190,19 +209,22 @@ router.put('/:id/people/:personId', (req, res) => {
     }
     person.managerId = managerId;
   }
-  if (name !== undefined) person.name = name;
-  if (title !== undefined) person.title = title;
-  if (department !== undefined) person.department = department;
-  if (photo !== undefined) person.photo = photo;
-  if (sponsorIds !== undefined && Array.isArray(sponsorIds)) {
-    person.sponsorIds = sponsorIds.filter((id): id is string => typeof id === 'string');
+  try {
+    if (name !== undefined) person.name = requireNonEmptyString(name, 'name');
+    if (title !== undefined) person.title = requireString(title, 'title');
+    if (department !== undefined) person.department = requireString(department, 'department');
+    if (photo !== undefined) person.photo = parsePhotoField(photo);
+    if (sponsorIds !== undefined) person.sponsorIds = requireStringArray(sponsorIds, 'sponsorIds');
+    if (tags !== undefined) person.tags = requireStringArray(tags, 'tags');
+    if (colorLabel !== undefined) person.colorLabel = requireString(colorLabel, 'colorLabel').trim();
+    if (notes !== undefined) person.notes = parseNotesField(notes);
+    if (position !== undefined) person.position = requirePosition(position);
+  } catch (err) {
+    if (err instanceof ValidationError) return res.status(400).json({ error: err.message });
+    throw err;
   }
-  if (tags !== undefined) person.tags = Array.isArray(tags) ? tags : person.tags;
   if (edgeColor !== undefined) person.edgeColor = parseColorField(edgeColor);
   if (backgroundColor !== undefined) person.backgroundColor = parseColorField(backgroundColor);
-  if (colorLabel !== undefined && typeof colorLabel === 'string') person.colorLabel = colorLabel.trim();
-  if (notes !== undefined) person.notes = parseNotesField(notes);
-  if (position !== undefined) person.position = position;
   person.updatedAt = new Date().toISOString();
 
   saveChart(chart);

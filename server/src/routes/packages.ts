@@ -13,11 +13,19 @@ import {
   readIndex,
   saveChart,
   saveSponsors,
+  isValidChartId,
 } from '../lib/dataStore';
 import type { Chart, Person, Sponsor } from '../types';
+import { sniffImageExtension } from '../lib/images';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
+
+// The export route builds a filesystem path from :chartId; keep it to a plain chart-id segment.
+router.param('chartId', (_req, res, next, chartId) => {
+  if (!isValidChartId(chartId)) return res.status(400).json({ error: 'Invalid chart id' });
+  next();
+});
 
 const MANIFEST_FILE = 'orgchartr-package.json';
 const CHART_FILE = 'chart.json';
@@ -206,21 +214,6 @@ function mappedPhoto(photo: string | null, mapping: Map<string, string>): string
   return photo ? mapping.get(photo) ?? null : null;
 }
 
-function validatePhotoData(filename: string, data: Buffer): void {
-  const extension = path.extname(filename).toLowerCase();
-  const valid = extension === '.png'
-    ? data.length >= 8 && data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
-    : extension === '.jpg' || extension === '.jpeg'
-      ? data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff
-      : extension === '.gif'
-        ? ['GIF87a', 'GIF89a'].includes(data.subarray(0, 6).toString('ascii'))
-        : extension === '.webp'
-          ? data.length >= 12
-            && data.subarray(0, 4).toString('ascii') === 'RIFF'
-            && data.subarray(8, 12).toString('ascii') === 'WEBP'
-          : false;
-  if (!valid) throw new Error(`The package contains an invalid image asset: ${filename}`);
-}
 
 // POST /api/packages/export/:chartId - download one chart and its referenced sponsors/photos.
 router.post('/export/:chartId', (req, res) => {
@@ -338,8 +331,10 @@ router.post('/import', upload.single('package'), (req, res) => {
       const entry = zip.getEntry(`assets/photos/${sourceName}`);
       if (!entry || entry.isDirectory) throw new Error(`The package is missing photo asset: ${sourceName}`);
       const data = entry.getData();
-      validatePhotoData(sourceName, data);
-      const targetName = `${nanoid(12)}${path.extname(sourceName).toLowerCase()}`;
+      // Store what the bytes actually are, not what the package's filename claims.
+      const detectedExt = sniffImageExtension(data);
+      if (!detectedExt) throw new Error(`The package contains an invalid image asset: ${sourceName}`);
+      const targetName = `${nanoid(12)}${detectedExt}`;
       fs.writeFileSync(path.join(PHOTOS_DIR, targetName), data, { flag: 'wx' });
       createdPhotos.push(targetName);
       photoMapping.set(sourceName, targetName);
