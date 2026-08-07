@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import { useChartStore } from '../store/chartStore';
 import { ConfirmDialog } from './ConfirmDialog';
 import type { ChartHistoryEntry } from '../types';
+import { useModalDialog } from '../hooks/useModalDialog';
 
 interface HistoryModalProps {
   chartId: string;
@@ -19,6 +20,7 @@ export function HistoryModal({ chartId, onClose }: HistoryModalProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingRestore, setPendingRestore] = useState<ChartHistoryEntry | null>(null);
   const [restored, setRestored] = useState(false);
+  const overlayRef = useModalDialog(onClose);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +49,7 @@ export function HistoryModal({ chartId, onClose }: HistoryModalProps) {
   }
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="history-title">
+    <div className="modal-overlay" ref={overlayRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="history-title">
       <div className="modal">
         <h2 id="history-title">Version history</h2>
         <p className="export-hint">

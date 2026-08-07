@@ -235,7 +235,7 @@ function csvCell(value: string): string {
 
 export function buildCsv(people: Person[], sponsorById: Map<string, Sponsor>): string {
   const nameById = new Map(people.map((p) => [p.id, p.name]));
-  const header = ['Name', 'Title', 'Department', 'Manager', 'Sponsors', 'Tags', 'Colour label', 'Edge colour', 'Background colour'];
+  const header = ['Name', 'Title', 'Department', 'Manager', 'Sponsors', 'Tags', 'Notes', 'Colour label', 'Edge colour', 'Background colour'];
   const rows = people.map((person) =>
     [
       person.name,
@@ -247,6 +247,7 @@ export function buildCsv(people: Person[], sponsorById: Map<string, Sponsor>): s
         return sponsor ? [sponsor.name] : [];
       }).join('; '),
       person.tags.join('; '),
+      person.notes,
       person.colorLabel,
       person.edgeColor ?? '',
       person.backgroundColor ?? '',

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useModalDialog } from '../hooks/useModalDialog';
 
 interface ConfirmDialogProps {
   title: string;
@@ -12,6 +13,9 @@ interface ConfirmDialogProps {
 export function ConfirmDialog({ title, message, confirmLabel = 'Confirm', danger, onConfirm, onCancel }: ConfirmDialogProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const overlayRef = useModalDialog(() => {
+    if (!busy) onCancel();
+  });
 
   async function handleConfirm() {
     setBusy(true);
@@ -25,16 +29,17 @@ export function ConfirmDialog({ title, message, confirmLabel = 'Confirm', danger
   }
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div className="modal-overlay" ref={overlayRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="confirm-title">
       <div className="modal">
         <h2 id="confirm-title">{title}</h2>
         <p>{message}</p>
         {error && <p className="error-text">{error}</p>}
         <div className="modal__actions">
-          <button type="button" onClick={onCancel} disabled={busy}>
+          {/* Cancel takes initial focus so Enter can't trigger a destructive action by accident. */}
+          <button type="button" onClick={onCancel} disabled={busy} autoFocus>
             Cancel
           </button>
-          <button type="button" className={danger ? 'danger' : 'primary'} onClick={handleConfirm} disabled={busy} autoFocus>
+          <button type="button" className={danger ? 'danger' : 'primary'} onClick={handleConfirm} disabled={busy}>
             {busy ? 'Working…' : confirmLabel}
           </button>
         </div>

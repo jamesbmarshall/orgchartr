@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { Person, Sponsor } from '../types';
 import { api } from '../api/client';
+import { useModalDialog } from '../hooks/useModalDialog';
 import { buildSubset, getDescendantIds } from '../utils/orgTree';
 import {
   EXPORT_FORMATS,
@@ -31,6 +32,9 @@ export function ExportModal({ chartId, partnerName, people, sponsors, onClose }:
   const [format, setFormat] = useState<ExportFormat>('svg');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const overlayRef = useModalDialog(() => {
+    if (!busy) onClose();
+  });
 
   const sponsorById = useMemo(() => new Map(sponsors.map((s) => [s.id, s])), [sponsors]);
 
@@ -113,7 +117,7 @@ export function ExportModal({ chartId, partnerName, people, sponsors, onClose }:
   const activeFormat = EXPORT_FORMATS.find((f) => f.value === format);
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="export-title">
+    <div className="modal-overlay" ref={overlayRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="export-title">
       <div className="modal modal--wide">
         <h2 id="export-title">Export org chart</h2>
 

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import type { Sponsor } from '../types';
 import { api, photoUrl } from '../api/client';
+import { useModalDialog } from '../hooks/useModalDialog';
 
 interface SponsorModalProps {
   sponsor?: Sponsor;
@@ -18,6 +19,9 @@ export function SponsorModal({ sponsor, onSave, onClose }: SponsorModalProps) {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const overlayRef = useModalDialog(() => {
+    if (!saving) onClose();
+  });
 
   function addTag() {
     const value = tagInput.trim();
@@ -63,7 +67,7 @@ export function SponsorModal({ sponsor, onSave, onClose }: SponsorModalProps) {
   const photoPreview = photoUrl(photo);
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="sponsor-modal-title">
+    <div className="modal-overlay" ref={overlayRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="sponsor-modal-title">
       <div className="modal">
         <h2 id="sponsor-modal-title">{sponsor ? 'Edit sponsor' : 'Add Microsoft sponsor'}</h2>
         {sponsor && (sponsor.createdAt || sponsor.updatedAt) && (
@@ -117,7 +121,14 @@ export function SponsorModal({ sponsor, onSave, onClose }: SponsorModalProps) {
             <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handlePhotoChange} />
           </label>
           {uploading && <p>Uploading photo…</p>}
-          {photoPreview && <img className="modal__photo-preview" src={photoPreview} alt="Preview" />}
+          {photoPreview && (
+            <div className="modal__photo-row">
+              <img className="modal__photo-preview" src={photoPreview} alt="Preview" />
+              <button type="button" onClick={() => setPhoto(null)}>
+                Remove photo
+              </button>
+            </div>
+          )}
 
           {error && <p className="error-text">{error}</p>}
 

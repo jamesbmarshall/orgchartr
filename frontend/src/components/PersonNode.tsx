@@ -1,5 +1,5 @@
 import { Handle, Position as FlowPosition, type NodeProps } from '@xyflow/react';
-import { ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, StickyNote, Trash2 } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import type { Person, Sponsor } from '../types';
 import { photoUrl } from '../api/client';
@@ -57,6 +57,13 @@ export function PersonNode({ data }: NodeProps & { data: PersonNodeData }) {
       {sponsors.length > 0 && (
         <div className="person-node__sponsor" title={`Microsoft sponsors: ${sponsors.map((sponsor) => sponsor.name).join(', ')}`}>
           🎗️ {sponsors.map((sponsor) => sponsor.name).join(', ')}
+        </div>
+      )}
+
+      {person.notes && (
+        <div className="person-node__notes" title={person.notes}>
+          <StickyNote aria-hidden="true" />
+          <span>{person.notes}</span>
         </div>
       )}
 

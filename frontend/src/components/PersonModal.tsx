@@ -5,6 +5,7 @@ import { getDescendantIds } from '../utils/orgTree';
 import { colorLegendEntries, colorSchemeKey, readableTextColor } from '../utils/personColors';
 import { comparePeopleBySurname } from '../utils/personNames';
 import { api, photoUrl } from '../api/client';
+import { useModalDialog } from '../hooks/useModalDialog';
 
 interface PersonModalProps {
   people: Person[];
@@ -38,6 +39,7 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
   const [draggedSponsorName, setDraggedSponsorName] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>(person?.tags ?? []);
   const [tagInput, setTagInput] = useState('');
+  const [notes, setNotes] = useState(person?.notes ?? '');
   const [photo, setPhoto] = useState<string | null>(person?.photo ?? null);
   const [useColorCoding, setUseColorCoding] = useState(
     Boolean(person?.edgeColor || person?.backgroundColor || person?.colorLabel),
@@ -52,6 +54,9 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const overlayRef = useModalDialog(() => {
+    if (!saving) onClose();
+  });
 
   const excludedManagerIds = person ? new Set([person.id, ...getDescendantIds(people, person.id)]) : new Set<string>();
   const managerOptions = people.filter((p) => !excludedManagerIds.has(p.id)).toSorted(comparePeopleBySurname);
@@ -174,6 +179,7 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
         managerId: managerId || null,
         sponsorIds: selectedSponsors.map((sponsor) => sponsor.id),
         tags,
+        notes: notes.trim(),
         photo,
         edgeColor: useColorCoding ? edgeColor : null,
         backgroundColor: useColorCoding && useCustomBackground ? backgroundColor : null,
@@ -188,7 +194,7 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
   const photoPreview = photoUrl(photo);
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="person-modal-title">
+    <div className="modal-overlay" ref={overlayRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="person-modal-title">
       <div className="modal">
         <h2 id="person-modal-title">{person ? 'Edit person' : 'Add person'}</h2>
         {person && (person.createdAt || person.updatedAt) && (
@@ -314,6 +320,16 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
               ))}
             </div>
           </label>
+          <label>
+            Notes
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Key facts worth remembering — decisions they own, preferences, recent conversations…"
+              rows={3}
+              maxLength={4000}
+            />
+          </label>
           <fieldset className="person-colors">
             <legend>Colour coding</legend>
             <label className="person-colors__toggle">
@@ -410,7 +426,14 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
             <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handlePhotoChange} />
           </label>
           {uploading && <p>Uploading photo…</p>}
-          {photoPreview && <img className="modal__photo-preview" src={photoPreview} alt="Preview" />}
+          {photoPreview && (
+            <div className="modal__photo-row">
+              <img className="modal__photo-preview" src={photoPreview} alt="Preview" />
+              <button type="button" onClick={() => setPhoto(null)}>
+                Remove photo
+              </button>
+            </div>
+          )}
 
           {error && <p className="error-text">{error}</p>}
 
