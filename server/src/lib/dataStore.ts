@@ -1,6 +1,19 @@
 import fs from 'fs';
 import path from 'path';
-import type { Chart, ChartHistoryEntry, ChartIndexEntry, Person, Sponsor } from '../types';
+import {
+  MAX_HISTORY_SNAPSHOTS,
+  SNAPSHOT_MIN_INTERVAL_MS,
+  isValidChartId,
+  migrateStoredChart,
+  migrateStoredSponsors,
+  parseColor,
+  type StoredChart,
+  type StoredSponsor,
+} from '@orgchartr/shared';
+import type { Chart, ChartHistoryEntry, ChartIndexEntry, Sponsor, SponsorUsageEntry } from '../types';
+
+export { isValidChartId, parseColor };
+export type { SponsorUsageEntry };
 
 // Resolve the data directory: DATA_DIR env var wins (used in Docker),
 // otherwise fall back to <repo root>/data for local `npm run dev`.
@@ -39,17 +52,6 @@ export function writeJsonAtomic(filePath: string, data: unknown): void {
   fs.renameSync(tmpPath, filePath);
 }
 
-/**
- * Chart IDs are produced by slugify() + optional nanoid suffix, so they only ever contain
- * lowercase letters, digits, and hyphens. Enforcing that shape keeps a request-supplied id from
- * ever escaping CHARTS_DIR via path segments like "../" or absolute/Windows paths.
- */
-const CHART_ID_PATTERN = /^[a-z0-9-]+$/;
-
-export function isValidChartId(id: unknown): id is string {
-  return typeof id === 'string' && CHART_ID_PATTERN.test(id) && id === path.basename(id);
-}
-
 /** Backstop for the filesystem helpers: refuses any id that isn't a plain chart-id segment. */
 function assertValidChartId(id: string): void {
   if (!isValidChartId(id)) {
@@ -74,55 +76,15 @@ export function listChartIds(): string[] {
   return readIndex().map((entry) => entry.id);
 }
 
-type StoredPerson = Omit<Person, 'sponsorIds' | 'notes' | 'createdAt' | 'updatedAt'> & {
-  sponsorIds?: string[];
-  sponsorId?: string | null;
-  edgeColor?: string | null;
-  backgroundColor?: string | null;
-  colorLabel?: string;
-  notes?: string;
-  createdAt?: string | null;
-  updatedAt?: string | null;
-};
-
-const HEX_COLOR = /^#[0-9a-f]{6}$/i;
-const LEGACY_DEFAULT_BACKGROUND = '#1a1d24';
-
-export function parseColor(value: unknown): string | null {
-  return typeof value === 'string' && HEX_COLOR.test(value) ? value : null;
-}
-
 /** Loads a chart from disk, migrating legacy field shapes (singular sponsorId, missing timestamps, etc). */
 export function loadChart(id: string): Chart | null {
   const filePath = chartFilePath(id);
   if (!fs.existsSync(filePath)) return null;
-  const chart = readJson<Omit<Chart, 'people' | 'description'> & { people: StoredPerson[]; description?: string }>(
-    filePath,
-    { id, partnerName: id, people: [] },
-  );
-  return {
-    ...chart,
-    description: typeof chart.description === 'string' ? chart.description : '',
-    people: chart.people.map(({ sponsorId, ...person }) => ({
-      ...person,
-      sponsorIds: Array.isArray(person.sponsorIds) ? person.sponsorIds : sponsorId ? [sponsorId] : [],
-      edgeColor: parseColor(person.edgeColor),
-      backgroundColor: person.backgroundColor?.toLocaleLowerCase() === LEGACY_DEFAULT_BACKGROUND
-        ? null
-        : parseColor(person.backgroundColor),
-      colorLabel: typeof person.colorLabel === 'string' ? person.colorLabel : '',
-      notes: typeof person.notes === 'string' ? person.notes : '',
-      createdAt: typeof person.createdAt === 'string' ? person.createdAt : null,
-      updatedAt: typeof person.updatedAt === 'string' ? person.updatedAt : null,
-    })),
-  };
+  const chart = readJson<StoredChart>(filePath, { id, partnerName: id, people: [] });
+  return migrateStoredChart(chart);
 }
 
 const CHART_HISTORY_DIR = path.join(CHARTS_DIR, 'history');
-/** Minimum time between automatic snapshots for the same chart, to bound history size. */
-const SNAPSHOT_MIN_INTERVAL_MS = 5 * 60 * 1000;
-/** Snapshots kept per chart before the oldest is pruned. */
-const MAX_HISTORY_SNAPSHOTS = 30;
 
 function chartHistoryDir(id: string): string {
   assertValidChartId(id);
@@ -227,18 +189,8 @@ export function deleteChartFile(id: string): boolean {
   return true;
 }
 
-type StoredSponsor = Omit<Sponsor, 'createdAt' | 'updatedAt'> & {
-  createdAt?: string | null;
-  updatedAt?: string | null;
-};
-
 export function loadSponsors(): Sponsor[] {
-  const sponsors = readJson<StoredSponsor[]>(SPONSORS_FILE, []);
-  return sponsors.map((sponsor) => ({
-    ...sponsor,
-    createdAt: typeof sponsor.createdAt === 'string' ? sponsor.createdAt : null,
-    updatedAt: typeof sponsor.updatedAt === 'string' ? sponsor.updatedAt : null,
-  }));
+  return migrateStoredSponsors(readJson<StoredSponsor[]>(SPONSORS_FILE, []));
 }
 
 export function saveSponsors(sponsors: Sponsor[]): void {
@@ -277,13 +229,6 @@ export function garbageCollectPhotos(): void {
       }
     }
   }
-}
-
-export interface SponsorUsageEntry {
-  chartId: string;
-  chartName: string;
-  personId: string;
-  personName: string;
 }
 
 /** Builds a map of sponsorId -> the people (across all charts) currently linked to it. Used to

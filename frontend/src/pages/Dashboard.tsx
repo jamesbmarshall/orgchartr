@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
+import { HardDrive } from 'lucide-react';
 import { useChartStore } from '../store/chartStore';
 import { useUndoStore } from '../store/undoStore';
+import { useStorageStore } from '../storage/storageStore';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { api } from '../api/client';
 
 export function Dashboard() {
   const { index, indexLoading, indexError, loadIndex, createChart, deleteChart } = useChartStore();
   const { scheduleDelete } = useUndoStore();
+  const switchFolder = useStorageStore((state) => state.switchFolder);
+  const isLocalMode = api.mode === 'local';
   const navigate = useNavigate();
   const [newPartnerName, setNewPartnerName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -121,9 +125,20 @@ export function Dashboard() {
     <div className="page">
       <div className="page__header">
         <h1>Org charts</h1>
-        <Link to="/sponsors" className="button-link">
-          Manage sponsors
-        </Link>
+        <div className="page__header-actions">
+          {isLocalMode && (
+            <span className="storage-mode" title="Your data is stored in this folder on your computer.">
+              <HardDrive size={14} aria-hidden />
+              {api.folderName}
+              <button type="button" onClick={() => void switchFolder()}>
+                Switch folder…
+              </button>
+            </span>
+          )}
+          <Link to="/sponsors" className="button-link">
+            Manage sponsors
+          </Link>
+        </div>
       </div>
 
       <form className="new-chart-form" onSubmit={handleCreate}>
@@ -197,20 +212,28 @@ export function Dashboard() {
         <button type="button" onClick={handleExportBackup} disabled={exportingBackup}>
           {exportingBackup ? 'Preparing…' : 'Export backup'}
         </button>
-        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={restoring}>
-          Restore from backup…
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".zip"
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) setRestoreFile(file);
-            e.target.value = '';
-          }}
-        />
+        {api.capabilities.backupRestore ? (
+          <>
+            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={restoring}>
+              Restore from backup…
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".zip"
+              hidden
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) setRestoreFile(file);
+                e.target.value = '';
+              }}
+            />
+          </>
+        ) : (
+          <span className="storage-mode">
+            Your folder is your backup - copy it any time, or unzip a backup and open that folder.
+          </span>
+        )}
       </div>
       {backupError && <p className="error-text">{backupError}</p>}
 

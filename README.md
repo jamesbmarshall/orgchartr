@@ -10,7 +10,7 @@ New here? Start with the plain-English [**Getting started guide**](docs/GETTING-
 - Each person carries a title, department, tags, a photo, free-text **notes** (decisions they own, how they like to be contacted, anything worth remembering), and links to one or more sponsors.
 - A shared, reusable sponsor directory you can link to any person on any chart.
 - Export a whole chart, or chosen branches and people, as SVG, PNG, CSV, or JSON.
-- Runs locally in Docker with no cloud hosting and no accounts to create.
+- Runs locally in Docker with no cloud hosting and no accounts to create — or as a hosted static site where the app runs entirely in your browser against a folder on your computer.
 - Stores its data in a folder you choose. The app never uploads, syncs, or backs up that folder for you.
 
 ## Quickstart
@@ -129,6 +129,26 @@ Photos are embedded in SVG and PNG exports. Portable packages include referenced
 - **(Linux) Charts won't save / the app looks read-only.** The container runs as a non-root user (uid 1000), so it needs write access to your data folder. Make it writable with `sudo chown -R 1000:1000 /path/to/your/data-folder` (Docker Desktop on Windows and macOS handles this automatically).
 - **Start fresh.** `docker compose down` stops everything; your data folder is never deleted by removing or rebuilding the container.
 
+## Hosted mode: no install, data still on your computer (advanced)
+
+orgchartr can also be hosted as a **static website** — no Docker, no server-side storage, nothing to install. In this mode the app runs entirely in your browser: on first visit it asks you to pick a folder on your computer, then reads and writes your charts, sponsors, and photos directly in that folder using the browser's File System Access API. **No chart data is ever uploaded to the server hosting the page** — the host only serves the app's HTML/JS/CSS.
+
+Good to know about hosted mode:
+
+- **Browser support.** Picking a local folder requires a Chromium-based browser (Chrome, Edge, Opera). Firefox and Safari can't grant folder access; the app shows a clear message instead.
+- **Same folder, either mode.** The folder layout is identical to the Docker version's data folder. You can open a Docker data folder in hosted mode, point Docker at a folder created in hosted mode, or unzip an exported backup and open that folder. Don't do both *at the same time* against one folder.
+- **Permissions.** The browser remembers your folder between visits, but may ask you to confirm access again when you return (one click). Chrome/Edge offer "Allow on every visit" to skip even that.
+- **Backups.** In hosted mode your folder *is* your data: copying it is a complete backup. **Export backup** still produces the same ZIP as the Docker version; restoring one is just "unzip it and open that folder". Chart packages import/export work as normal.
+
+To deploy it yourself, build the frontend with the local-only flag and publish `frontend/dist/` on any static host:
+
+```bash
+npm install
+VITE_FORCE_LOCAL_MODE=true npm run build
+```
+
+(Without the flag, the same build auto-detects: it uses the API when served by the Express server and falls back to local-folder mode when there is no API — so the Docker image is unaffected.) If you host under a sub-path, set Vite's [`base`](https://vite.dev/config/shared-options.html#base) accordingly.
+
 ## Exposing it on a network (advanced)
 
 By default the app is published on `127.0.0.1:3000`, so only this machine can reach it. orgchartr has **no authentication** — anyone who can reach the port has full access to every stakeholder record and can delete or replace all data. If you understand that and still want LAN access, change the `ports` entry in `docker-compose.yml` from `127.0.0.1:3000:3000` to `3000:3000` and rebuild. On a Linux host, remember that Docker's firewall rules can bypass `ufw`.
@@ -147,7 +167,8 @@ npm run dev
 This runs the Express API on port 3001 and the Vite dev server (with hot reload) on 5173, proxying `/api` and `/photos` to the API. Open **http://localhost:5173**. Set `DATA_DIR` before `npm run dev` to use a folder other than `./data`.
 
 ```
-frontend/   React + TypeScript + React Flow canvas UI
+shared/     Pure TypeScript domain logic + types used by both frontend and server
+frontend/   React + TypeScript + React Flow canvas UI (server mode + local-folder mode)
 server/     Express + TypeScript API, reads/writes DATA_DIR
 docs/       Getting-started and "why" guides
 scripts/    Data-folder pickers (Windows and macOS/Linux)

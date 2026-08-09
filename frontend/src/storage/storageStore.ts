@@ -1,0 +1,164 @@
+import { create } from 'zustand';
+import { setActiveAdapter } from './active';
+import { serverAdapter } from './serverAdapter';
+import { LocalFolderAdapter } from './localAdapter';
+import { clearDirectoryHandle, loadDirectoryHandle, saveDirectoryHandle } from './handleStore';
+
+export type StorageStatus =
+  /** Deciding between server and local mode. */
+  | 'probing'
+  /** An adapter is active; the app can render. */
+  | 'ready'
+  /** Local mode, no remembered folder: show the "choose a folder" onboarding. */
+  | 'local-picker'
+  /** Local mode with a remembered folder that needs its permission re-granted (user gesture). */
+  | 'local-reopen'
+  /** Local mode in a browser without the File System Access API. */
+  | 'unsupported';
+
+interface StorageState {
+  status: StorageStatus;
+  mode: 'server' | 'local' | null;
+  folderName: string | null;
+  /** Name of the remembered folder awaiting permission re-grant. */
+  rememberedFolderName: string | null;
+  error: string | null;
+
+  initialise: () => Promise<void>;
+  /** Opens the directory picker; must be called from a user gesture (click). */
+  pickFolder: () => Promise<void>;
+  /** Re-requests permission on the remembered folder; must be called from a user gesture. */
+  reopenFolder: () => Promise<void>;
+  /** Forgets the remembered folder and returns to the picker screen. */
+  forgetFolder: () => Promise<void>;
+  /** Switches to a different folder from within the running app (user gesture). */
+  switchFolder: () => Promise<void>;
+}
+
+function supportsFileSystemAccess(): boolean {
+  return typeof window !== 'undefined' && 'showDirectoryPicker' in window;
+}
+
+const FORCE_LOCAL = import.meta.env.VITE_FORCE_LOCAL_MODE === 'true';
+const PROBE_TIMEOUT_MS = 1500;
+
+/** True when the Express API answers, meaning the app is served by the self-hosted server. */
+async function probeServer(): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  try {
+    const res = await fetch('/api/health', { signal: controller.signal });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+let activeLocalAdapter: LocalFolderAdapter | null = null;
+let initialiseStarted = false;
+
+export const useStorageStore = create<StorageState>((set, get) => {
+  async function activateLocal(handle: FileSystemDirectoryHandle): Promise<void> {
+    const adapter = new LocalFolderAdapter(handle);
+    await adapter.initialise();
+    activeLocalAdapter?.dispose();
+    activeLocalAdapter = adapter;
+    setActiveAdapter(adapter);
+    await saveDirectoryHandle(handle);
+    set({ status: 'ready', mode: 'local', folderName: handle.name, rememberedFolderName: null, error: null });
+  }
+
+  return {
+    status: 'probing',
+    mode: null,
+    folderName: null,
+    rememberedFolderName: null,
+    error: null,
+
+    initialise: async () => {
+      if (initialiseStarted) return;
+      initialiseStarted = true;
+
+      if (!FORCE_LOCAL && (await probeServer())) {
+        setActiveAdapter(serverAdapter);
+        set({ status: 'ready', mode: 'server', error: null });
+        return;
+      }
+
+      if (!supportsFileSystemAccess()) {
+        set({ status: 'unsupported' });
+        return;
+      }
+
+      const remembered = await loadDirectoryHandle();
+      if (!remembered) {
+        set({ status: 'local-picker' });
+        return;
+      }
+      try {
+        if ((await remembered.queryPermission({ mode: 'readwrite' })) === 'granted') {
+          await activateLocal(remembered);
+          return;
+        }
+        set({ status: 'local-reopen', rememberedFolderName: remembered.name });
+      } catch {
+        await clearDirectoryHandle();
+        set({ status: 'local-picker' });
+      }
+    },
+
+    pickFolder: async () => {
+      try {
+        const handle = await window.showDirectoryPicker({ id: 'orgchartr-data', mode: 'readwrite' });
+        await activateLocal(handle);
+      } catch (err) {
+        // AbortError: the user closed the picker; stay where we are.
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        set({
+          status: 'local-picker',
+          error: err instanceof Error ? err.message : 'Could not open that folder. Please try another one.',
+        });
+      }
+    },
+
+    reopenFolder: async () => {
+      const remembered = await loadDirectoryHandle();
+      if (!remembered) {
+        set({ status: 'local-picker', rememberedFolderName: null });
+        return;
+      }
+      try {
+        if ((await remembered.requestPermission({ mode: 'readwrite' })) === 'granted') {
+          await activateLocal(remembered);
+          return;
+        }
+        set({ status: 'local-reopen', error: 'Permission was not granted. You can try again or choose a different folder.' });
+      } catch (err) {
+        set({
+          status: 'local-reopen',
+          error: err instanceof Error ? err.message : 'Could not reopen the folder.',
+        });
+      }
+    },
+
+    forgetFolder: async () => {
+      await clearDirectoryHandle();
+      set({ status: 'local-picker', rememberedFolderName: null, error: null });
+    },
+
+    switchFolder: async () => {
+      if (get().mode !== 'local') return;
+      try {
+        const handle = await window.showDirectoryPicker({ id: 'orgchartr-data', mode: 'readwrite' });
+        await activateLocal(handle);
+        // Data under every route changed wholesale; reload so all stores re-fetch.
+        window.location.reload();
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        set({ error: err instanceof Error ? err.message : 'Could not open that folder.' });
+      }
+    },
+  };
+});
