@@ -48,7 +48,9 @@ async function probeServer(): Promise<boolean> {
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   try {
     const res = await fetch('/api/health', { signal: controller.signal });
-    return res.ok;
+    // Static hosts (and `vite preview`) answer unknown paths with the SPA's index.html and a
+    // 200, so a JSON content-type is what actually distinguishes the Express API.
+    return res.ok && (res.headers.get('content-type') ?? '').includes('application/json');
   } catch {
     return false;
   } finally {
