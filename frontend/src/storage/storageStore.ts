@@ -65,10 +65,10 @@ export const useStorageStore = create<StorageState>((set, get) => {
   async function activateLocal(handle: FileSystemDirectoryHandle): Promise<void> {
     const adapter = new LocalFolderAdapter(handle);
     await adapter.initialise();
+    await saveDirectoryHandle(handle);
     activeLocalAdapter?.dispose();
     activeLocalAdapter = adapter;
     setActiveAdapter(adapter);
-    await saveDirectoryHandle(handle);
     set({ status: 'ready', mode: 'local', folderName: handle.name, rememberedFolderName: null, error: null });
   }
 

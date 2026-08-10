@@ -1,43 +1,30 @@
 # syntax=docker/dockerfile:1
 
-# ---- Stage 1: build frontend + server ----
+# ---- Stage 1: build the local-folder frontend ----
 FROM node:22-alpine AS build
 WORKDIR /app
 
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+ARG VITE_FORCE_LOCAL_MODE=true
+
 COPY package.json package-lock.json ./
+COPY shared/package.json shared/package.json
 COPY frontend/package.json frontend/package.json
 COPY server/package.json server/package.json
-RUN npm ci
+RUN npm ci --registry="$NPM_REGISTRY"
 
+COPY shared ./shared
 COPY frontend ./frontend
-COPY server ./server
-RUN npm run build
+RUN npm run build -w shared \
+  && VITE_FORCE_LOCAL_MODE="$VITE_FORCE_LOCAL_MODE" npm run build -w frontend
 
-# ---- Stage 2: production runtime ----
-FROM node:22-alpine AS runtime
-WORKDIR /app
+# ---- Stage 2: static production runtime ----
+FROM nginx:alpine AS runtime
 
-COPY package.json package-lock.json ./
-COPY server/package.json server/package.json
-RUN npm ci --omit=dev --workspace=server
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/frontend/dist /usr/share/nginx/html
 
-COPY --from=build /app/server/dist ./server/dist
-COPY --from=build /app/frontend/dist ./frontend/dist
+EXPOSE 8080
 
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV DATA_DIR=/app/data
-ENV FRONTEND_DIST=/app/frontend/dist
-
-EXPOSE 3000
-
-# Run as the unprivileged `node` user (uid 1000) shipped with the base image rather than root.
-# The bind-mounted host data directory must be writable by uid 1000 (on Docker Desktop this is
-# automatic; on a Linux host, `chown 1000:1000` the data directory or make it group-writable).
-USER node
-
-# Report unhealthy if the API is down or the data directory isn't writable.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD node -e "require('http').get('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
-
-CMD ["node", "server/dist/index.js"]
+  CMD wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1

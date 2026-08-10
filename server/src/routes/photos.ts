@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer, { MulterError } from 'multer';
 import fs from 'fs';
 import path from 'path';
-import { nanoid } from 'nanoid';
+import { randomId } from '@orgchartr/shared';
 import { PHOTOS_DIR } from '../lib/dataStore';
 import { sniffImageExtension } from '../lib/images';
 
@@ -36,7 +36,7 @@ router.post('/', (req, res) => {
       return res.status(400).json({ error: 'Unsupported file type. Use JPEG, PNG, WEBP, or GIF.' });
     }
 
-    const filename = `${nanoid(12)}${ext}`;
+    const filename = `${randomId(12)}${ext}`;
     try {
       fs.writeFileSync(path.join(PHOTOS_DIR, filename), req.file.buffer, { flag: 'wx' });
     } catch {

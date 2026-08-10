@@ -1,5 +1,5 @@
-import { nanoid } from 'nanoid';
 import type { Chart, Person, Sponsor } from './types';
+import { randomId } from './ids';
 import { isStoredPhotoName } from './images';
 import { isSelfOrDescendant } from './tree';
 import {
@@ -34,16 +34,19 @@ export function parseNotesField(value: unknown): string {
  */
 export function buildPerson(input: Record<string, unknown>, people: Person[], now: string): Person {
   const { name, title, department, photo, managerId, sponsorIds, tags, edgeColor, backgroundColor, colorLabel, notes } = input;
-  if (managerId && !people.some((p) => p.id === managerId)) {
+  const parsedManagerId = managerId === null || managerId === undefined
+    ? null
+    : requireNonEmptyString(managerId, 'managerId');
+  if (parsedManagerId && !people.some((p) => p.id === parsedManagerId)) {
     throw new ValidationError('managerId does not exist in this chart');
   }
   return {
-    id: nanoid(10),
+    id: randomId(10),
     name: requireNonEmptyString(name, 'name'),
     title: title === undefined ? '' : requireString(title, 'title'),
     department: department === undefined ? '' : requireString(department, 'department'),
     photo: parsePhotoField(photo),
-    managerId: (managerId as string | null | undefined) ?? null,
+    managerId: parsedManagerId,
     sponsorIds: sponsorIds === undefined ? [] : requireStringArray(sponsorIds, 'sponsorIds'),
     tags: tags === undefined ? [] : requireStringArray(tags, 'tags'),
     edgeColor: parseColorField(edgeColor),
@@ -108,7 +111,7 @@ export function applyPositions(chart: Chart, positions: Record<string, unknown>,
 export function buildSponsor(input: Record<string, unknown>, now: string): Sponsor {
   const { name, title, department, photo, tags } = input;
   return {
-    id: nanoid(10),
+    id: randomId(10),
     name: requireNonEmptyString(name, 'name'),
     title: title === undefined ? '' : requireString(title, 'title'),
     department: department === undefined ? '' : requireString(department, 'department'),

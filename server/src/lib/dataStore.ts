@@ -156,8 +156,8 @@ export function restoreChartFromHistory(id: string, timestamp: string): Chart | 
   const snapshotPath = path.join(chartHistoryDir(id), `${epoch}.json`);
   if (!fs.existsSync(snapshotPath)) return null;
   snapshotChartHistory(id, true);
-  const snapshot = readJson<Chart>(snapshotPath, { id, partnerName: id, description: '', people: [] });
-  saveChart(snapshot);
+  const snapshot = readJson<StoredChart>(snapshotPath, { id, partnerName: id, people: [] });
+  saveChart(migrateStoredChart(snapshot));
   return loadChart(id);
 }
 

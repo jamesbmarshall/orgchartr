@@ -22,16 +22,7 @@ If someone shared the orgchartr folder with you, put it somewhere sensible (like
 
 You should end up with a folder called `orgchartr` containing files like `README.md` and `docker-compose.yml`.
 
-## Step 3 — (Optional) Choose where your data is saved
-
-By default orgchartr saves everything in a `data` folder inside the orgchartr folder. If you'd rather keep it in OneDrive (so it's backed up automatically), set that up now:
-
-- **Windows:** open PowerShell in the orgchartr folder and run `./scripts/select-data-directory.ps1`, then pick your folder.
-- **macOS / Linux:** open Terminal in the orgchartr folder and run `./scripts/select-data-directory.sh`, then pick or type your folder.
-
-You can skip this and do it later — the default `data` folder works fine to start.
-
-## Step 4 — Start orgchartr
+## Step 3 — Start orgchartr
 
 1. Open a terminal **in the orgchartr folder**:
    - **Windows:** in File Explorer, click the address bar, type `powershell`, and press Enter.
@@ -42,20 +33,20 @@ You can skip this and do it later — the default `data` folder works fine to st
    ```
 3. The first run downloads and builds things — this can take a few minutes. When it finishes and returns you to the prompt, orgchartr is running.
 
-## Step 5 — Open it
+## Step 4 — Open it and choose your data folder
 
-Open your web browser and go to **http://localhost:3000**.
+Open Chrome or Edge and go to **http://localhost:3000**. Choose an empty folder to start fresh, or an existing orgchartr folder to continue. The browser reads and writes that folder directly; Docker never sees its contents.
 
-You'll see the orgchartr dashboard. It's empty for now — let's fix that.
+After granting access, you'll see the orgchartr dashboard. It's empty for now — let's fix that.
 
 > orgchartr only opens on the computer it's running on. That's on purpose: it has no password, so it isn't exposed to anyone else on your network.
 
-## Step 6 — Create your first chart
+## Step 5 — Create your first chart
 
 1. On the dashboard, type a partner or team name (for example `Contoso`) into the **new chart** box and create it.
 2. Click the chart to open it. You'll see an empty canvas with an **Add your first person** button in the middle.
 
-## Step 7 — Add a person
+## Step 6 — Add a person
 
 1. Click **Add your first person** (or **Add person** in the toolbar).
 2. Fill in what you know:
@@ -67,7 +58,7 @@ You'll see the orgchartr dashboard. It's empty for now — let's fix that.
 
 Add a few more people, setting each one's manager, and orgchartr arranges them into a tidy tree. You can also drag a line from the bottom of one person's card to another to set who reports to whom.
 
-## Step 8 — Link a sponsor
+## Step 7 — Link a sponsor
 
 A **sponsor** is anyone who owns or supports the relationship with someone on the chart. Sponsors live in a shared directory so you can reuse them across every chart.
 
@@ -75,7 +66,7 @@ A **sponsor** is anyone who owns or supports the relationship with someone on th
 2. In the **Sponsors** box, start typing a name. If they already exist, pick them; if not, type the full name and it's created for you when you save.
 3. Save. The person's card now shows who sponsors them, and you can filter a chart by sponsor to see everyone one person covers.
 
-## Step 9 — Put it in a slide
+## Step 8 — Put it in a slide
 
 When you want the chart in PowerPoint:
 

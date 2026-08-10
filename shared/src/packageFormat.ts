@@ -4,8 +4,8 @@
  * adapter so both modes accept exactly the same packages.
  */
 
-import { nanoid } from 'nanoid';
 import type { Chart, Person, Sponsor } from './types';
+import { randomId } from './ids';
 import { ALLOWED_PHOTO_EXTENSIONS, photoExtension } from './images';
 import { isRecord } from './validation';
 
@@ -13,6 +13,7 @@ export const PACKAGE_MANIFEST_FILE = 'orgchartr-package.json';
 export const PACKAGE_CHART_FILE = 'chart.json';
 export const PACKAGE_SPONSORS_FILE = 'sponsors.json';
 export const PACKAGE_FORMAT_VERSION = 1;
+export const MAX_PACKAGE_ARCHIVE_SIZE = 100 * 1024 * 1024;
 export const MAX_PACKAGE_ENTRIES = 10_000;
 export const MAX_EXPANDED_SIZE = 500 * 1024 * 1024;
 
@@ -79,7 +80,7 @@ export function parsePackagePerson(value: unknown): Person {
   }
   const managerId = value.managerId === null || value.managerId === undefined
     ? null
-    : typeof value.managerId === 'string' ? value.managerId : null;
+    : typeof value.managerId === 'string' && value.managerId ? value.managerId : null;
   if (value.managerId !== null && value.managerId !== undefined && managerId === null) {
     throw new Error('The package contains an invalid manager mapping.');
   }
@@ -255,7 +256,7 @@ export function mergePackageSponsors(
       sponsorMapping.set(sponsor.id, existing.id);
       continue;
     }
-    const id = sameId ? nanoid(10) : sponsor.id;
+    const id = sameId ? randomId(10) : sponsor.id;
     const imported = { ...sponsor, id, photo: mappedPhoto(sponsor.photo, photoMapping) };
     nextSponsors.push(imported);
     existingById.set(id, imported);

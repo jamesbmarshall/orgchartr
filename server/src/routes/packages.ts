@@ -3,9 +3,9 @@ import multer from 'multer';
 import AdmZip from 'adm-zip';
 import fs from 'fs';
 import path from 'path';
-import { nanoid } from 'nanoid';
 import {
   MAX_EXPANDED_SIZE,
+  MAX_PACKAGE_ARCHIVE_SIZE,
   MAX_PACKAGE_ENTRIES,
   PACKAGE_CHART_FILE,
   PACKAGE_MANIFEST_FILE,
@@ -17,6 +17,7 @@ import {
   parsePackageChart,
   parsePackageManifest,
   parsePackageSponsor,
+  randomId,
   slugify,
   sniffImageExtension,
   uniqueChartId,
@@ -36,7 +37,7 @@ import {
 import type { Chart } from '../types';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_PACKAGE_ARCHIVE_SIZE } });
 
 // The export route builds a filesystem path from :chartId; keep it to a plain chart-id segment.
 router.param('chartId', (_req, res, next, chartId) => {
@@ -131,7 +132,7 @@ router.post('/import', upload.single('package'), (req, res) => {
       // Store what the bytes actually are, not what the package's filename claims.
       const detectedExt = sniffImageExtension(data);
       if (!detectedExt) throw new Error(`The package contains an invalid image asset: ${sourceName}`);
-      const targetName = `${nanoid(12)}${detectedExt}`;
+      const targetName = `${randomId(12)}${detectedExt}`;
       fs.writeFileSync(path.join(PHOTOS_DIR, targetName), data, { flag: 'wx' });
       createdPhotos.push(targetName);
       photoMapping.set(sourceName, targetName);

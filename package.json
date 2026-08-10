@@ -15,6 +15,9 @@
     "build:shared": "npm run build -w shared",
     "start": "npm run start -w server"
   },
+  "overrides": {
+    "nanoid": "6.0.0"
+  },
   "devDependencies": {
     "concurrently": "^9.1.0"
   }

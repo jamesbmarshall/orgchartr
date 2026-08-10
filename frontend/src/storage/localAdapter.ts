@@ -5,12 +5,12 @@
  * is directly usable as a data folder. No data ever leaves the browser.
  */
 
-import { nanoid } from 'nanoid';
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import {
   BACKUP_MANIFEST_FILE,
   MAX_EXPANDED_SIZE,
   MAX_HISTORY_SNAPSHOTS,
+  MAX_PACKAGE_ARCHIVE_SIZE,
   MAX_PACKAGE_ENTRIES,
   MAX_PHOTO_SIZE,
   PACKAGE_CHART_FILE,
@@ -33,6 +33,7 @@ import {
   parsePackageChart,
   parsePackageManifest,
   parsePackageSponsor,
+  randomId,
   removePersonWithReparent,
   sniffImageExtension,
   uniqueChartId,
@@ -46,6 +47,7 @@ import {
   ensureDataDirs,
   fileExists,
   getDir,
+  isNotFoundError,
   listFiles,
   readFileBytes,
   readJson,
@@ -111,6 +113,12 @@ export class LocalFolderAdapter implements StorageAdapter {
     const dir = await getDir(this.root, ['assets', 'photos'], { create: true });
     if (!dir) throw new Error('Could not open the data folder.');
     return dir;
+  }
+
+  private async requireFileBytes(dir: FileSystemDirectoryHandle, name: string): Promise<Uint8Array> {
+    const data = await readFileBytes(dir, name);
+    if (!data) throw new Error(`The data file disappeared while it was being read: ${name}`);
+    return data;
   }
 
   private historyDir(id: string, create: boolean): Promise<FileSystemDirectoryHandle | null> {
@@ -207,7 +215,8 @@ export class LocalFolderAdapter implements StorageAdapter {
       try {
         const file = await (await photos.getFileHandle(name)).getFile();
         this.photoUrls.set(name, URL.createObjectURL(file));
-      } catch {
+      } catch (error) {
+        if (!isNotFoundError(error)) throw error;
         // Missing photo file; the UI falls back to the initials avatar.
       }
     }
@@ -216,7 +225,7 @@ export class LocalFolderAdapter implements StorageAdapter {
   private async writePhoto(data: Uint8Array): Promise<string> {
     const ext = sniffImageExtension(data);
     if (!ext) throw new Error('Unsupported file type. Use JPEG, PNG, WEBP, or GIF.');
-    const filename = `${nanoid(12)}${ext}`;
+    const filename = `${randomId(12)}${ext}`;
     await writeBytes(await this.photosDir(), filename, data);
     this.photoUrls.set(filename, URL.createObjectURL(new Blob([data as BlobPart])));
     return filename;
@@ -336,8 +345,8 @@ export class LocalFolderAdapter implements StorageAdapter {
       }
       // Snapshot the current state first (unthrottled) so the restore itself can be undone.
       await this.snapshotChartHistory(id, true);
-      const snapshot = await readJson<Chart>(dir, name, { id, partnerName: id, description: '', people: [] });
-      await this.saveChart(snapshot);
+      const snapshot = await readJson<StoredChart>(dir, name, { id, partnerName: id, people: [] });
+      await this.saveChart(migrateStoredChart(snapshot));
       const restored = await this.requireChart(id);
       await this.ensurePhotoUrls(restored.people.map((person) => person.photo));
       return restored;
@@ -478,38 +487,42 @@ export class LocalFolderAdapter implements StorageAdapter {
 
   // ---- StorageAdapter: portable chart packages -----------------------------
 
-  async exportChartPackage(chartId: string, personIds: string[]): Promise<Blob> {
-    const chart = await this.requireChart(chartId);
-    if (!Array.isArray(personIds) || personIds.length === 0 || personIds.some((id) => typeof id !== 'string')) {
-      throw new Error('Select at least one person to export.');
-    }
-    const selectedIds = new Set<string>(personIds);
-    if ([...selectedIds].some((id) => !chart.people.some((person) => person.id === id))) {
-      throw new Error('The export selection contains a person outside this chart.');
-    }
+  exportChartPackage(chartId: string, personIds: string[]): Promise<Blob> {
+    return this.withLock(async () => {
+      const chart = await this.requireChart(chartId);
+      if (!Array.isArray(personIds) || personIds.length === 0 || personIds.some((id) => typeof id !== 'string')) {
+        throw new Error('Select at least one person to export.');
+      }
+      const selectedIds = new Set<string>(personIds);
+      if ([...selectedIds].some((id) => !chart.people.some((person) => person.id === id))) {
+        throw new Error('The export selection contains a person outside this chart.');
+      }
 
-    const photosDir = await this.photosDir();
-    const existing = new Set(await listFiles(photosDir));
-    const { chart: packagedChart, sponsors, photos } = buildPackageContents(
-      chart,
-      selectedIds,
-      await this.loadSponsorList(),
-      (photo) => existing.has(photo),
-    );
+      const photosDir = await this.photosDir();
+      const existing = new Set(await listFiles(photosDir));
+      const { chart: packagedChart, sponsors, photos } = buildPackageContents(
+        chart,
+        selectedIds,
+        await this.loadSponsorList(),
+        (photo) => existing.has(photo),
+      );
 
-    const files: Record<string, Uint8Array> = {};
-    files[PACKAGE_MANIFEST_FILE] = strToU8(`${JSON.stringify(buildPackageManifest(), null, 2)}\n`);
-    files[PACKAGE_CHART_FILE] = strToU8(`${JSON.stringify(packagedChart, null, 2)}\n`);
-    files[PACKAGE_SPONSORS_FILE] = strToU8(`${JSON.stringify(sponsors, null, 2)}\n`);
-    for (const photo of photos) {
-      const data = await readFileBytes(photosDir, photo);
-      if (data) files[`assets/photos/${photo}`] = data;
-    }
-    return new Blob([zipSync(files) as BlobPart], { type: 'application/zip' });
+      const files: Record<string, Uint8Array> = {};
+      files[PACKAGE_MANIFEST_FILE] = strToU8(`${JSON.stringify(buildPackageManifest(), null, 2)}\n`);
+      files[PACKAGE_CHART_FILE] = strToU8(`${JSON.stringify(packagedChart, null, 2)}\n`);
+      files[PACKAGE_SPONSORS_FILE] = strToU8(`${JSON.stringify(sponsors, null, 2)}\n`);
+      for (const photo of photos) {
+        files[`assets/photos/${photo}`] = await this.requireFileBytes(photosDir, photo);
+      }
+      return new Blob([zipSync(files) as BlobPart], { type: 'application/zip' });
+    });
   }
 
   importChartPackage(file: File): Promise<Chart> {
     return this.withLock(async () => {
+      if (file.size > MAX_PACKAGE_ARCHIVE_SIZE) {
+        throw new Error('The chart package is larger than the 100 MB limit.');
+      }
       let entries: Record<string, Uint8Array>;
       try {
         entries = unzipSync(new Uint8Array(await file.arrayBuffer()));
@@ -593,9 +606,17 @@ export class LocalFolderAdapter implements StorageAdapter {
         return importedChart;
       } catch (error) {
         if (importedChartId) {
-          const charts = await this.chartsDir();
-          await removeEntry(charts, `${importedChartId}.json`);
-          await this.writeIndex((await this.readIndex()).filter((e) => e.id !== importedChartId));
+          try {
+            const charts = await this.chartsDir();
+            await removeEntry(charts, `${importedChartId}.json`);
+          } catch {
+            /* Best-effort rollback. */
+          }
+          try {
+            await this.writeIndex((await this.readIndex()).filter((e) => e.id !== importedChartId));
+          } catch {
+            /* Best-effort rollback. */
+          }
         }
         if (sponsorsSaved) {
           try {
@@ -618,36 +639,36 @@ export class LocalFolderAdapter implements StorageAdapter {
 
   // ---- StorageAdapter: backup ----------------------------------------------
 
-  async exportBackup(): Promise<Blob> {
-    const files: Record<string, Uint8Array> = {};
-    files[BACKUP_MANIFEST_FILE] = strToU8(`${JSON.stringify(buildBackupManifest(), null, 2)}\n`);
+  exportBackup(): Promise<Blob> {
+    return this.withLock(async () => {
+      const files: Record<string, Uint8Array> = {};
+      files[BACKUP_MANIFEST_FILE] = strToU8(`${JSON.stringify(buildBackupManifest(), null, 2)}\n`);
 
-    const charts = await this.chartsDir();
-    for (const name of await listFiles(charts)) {
-      const data = await readFileBytes(charts, name);
-      if (data) files[`charts/${name}`] = data;
-    }
-    const history = await getDir(this.root, ['charts', 'history']);
-    if (history) {
-      for await (const [chartId, handle] of history.entries()) {
-        if (handle.kind !== 'directory') continue;
-        const dir = handle as FileSystemDirectoryHandle;
-        for (const name of await listFiles(dir)) {
-          const data = await readFileBytes(dir, name);
-          if (data) files[`charts/history/${chartId}/${name}`] = data;
+      const charts = await this.chartsDir();
+      const chartFiles = await listFiles(charts);
+      if (!chartFiles.includes('index.json')) throw new Error('The data folder is missing charts/index.json.');
+      for (const name of chartFiles) {
+        files[`charts/${name}`] = await this.requireFileBytes(charts, name);
+      }
+      const history = await getDir(this.root, ['charts', 'history']);
+      if (history) {
+        for await (const [chartId, handle] of history.entries()) {
+          if (handle.kind !== 'directory') continue;
+          const dir = handle as FileSystemDirectoryHandle;
+          for (const name of await listFiles(dir)) {
+            files[`charts/history/${chartId}/${name}`] = await this.requireFileBytes(dir, name);
+          }
         }
       }
-    }
-    const sponsors = await readFileBytes(this.root, 'sponsors.json');
-    if (sponsors) files['sponsors.json'] = sponsors;
-    const photos = await getDir(this.root, ['assets', 'photos']);
-    if (photos) {
-      for (const name of await listFiles(photos)) {
-        const data = await readFileBytes(photos, name);
-        if (data) files[`assets/photos/${name}`] = data;
+      files['sponsors.json'] = await this.requireFileBytes(this.root, 'sponsors.json');
+      const photos = await getDir(this.root, ['assets', 'photos']);
+      if (photos) {
+        for (const name of await listFiles(photos)) {
+          files[`assets/photos/${name}`] = await this.requireFileBytes(photos, name);
+        }
       }
-    }
-    return new Blob([zipSync(files) as BlobPart], { type: 'application/zip' });
+      return new Blob([zipSync(files) as BlobPart], { type: 'application/zip' });
+    });
   }
 
   restoreBackup(): Promise<void> {

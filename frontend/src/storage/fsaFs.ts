@@ -5,6 +5,10 @@
  * server's temp-file+rename pattern.
  */
 
+export function isNotFoundError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'NotFoundError';
+}
+
 export async function getDir(
   root: FileSystemDirectoryHandle,
   segments: string[],
@@ -14,8 +18,9 @@ export async function getDir(
   for (const segment of segments) {
     try {
       dir = await dir.getDirectoryHandle(segment, { create: options?.create ?? false });
-    } catch {
-      return null;
+    } catch (error) {
+      if (isNotFoundError(error)) return null;
+      throw error;
     }
   }
   return dir;
@@ -26,8 +31,9 @@ export async function readFileBytes(dir: FileSystemDirectoryHandle, name: string
     const handle = await dir.getFileHandle(name);
     const file = await handle.getFile();
     return new Uint8Array(await file.arrayBuffer());
-  } catch {
-    return null;
+  } catch (error) {
+    if (isNotFoundError(error)) return null;
+    throw error;
   }
 }
 
@@ -38,9 +44,9 @@ export async function readJson<T>(dir: FileSystemDirectoryHandle, name: string, 
     const raw = await file.text();
     if (!raw.trim()) return fallback;
     return JSON.parse(raw) as T;
-  } catch (err) {
-    if (err instanceof DOMException) return fallback;
-    throw err;
+  } catch (error) {
+    if (isNotFoundError(error)) return fallback;
+    throw error;
   }
 }
 
@@ -62,8 +68,9 @@ export async function fileExists(dir: FileSystemDirectoryHandle, name: string): 
   try {
     await dir.getFileHandle(name);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    if (isNotFoundError(error)) return false;
+    throw error;
   }
 }
 
@@ -75,8 +82,9 @@ export async function removeEntry(
   try {
     await dir.removeEntry(name, { recursive: options?.recursive ?? false });
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    if (isNotFoundError(error)) return false;
+    throw error;
   }
 }
 
