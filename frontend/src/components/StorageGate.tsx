@@ -75,13 +75,13 @@ export function StorageGate({ children }: { children: React.ReactNode }) {
         <FolderOpen size={32} aria-hidden />
         <h1>Choose your data folder</h1>
         <p>
-          orgchartr stores everything - charts, people, sponsors, and photos - as plain files in a
-          folder you pick on this computer. Pick an empty folder to start fresh, or an existing
-          orgchartr data folder (or unzipped backup) to continue where you left off.
+          Choose a dedicated empty folder to start fresh, or an existing orgchartr data folder (or
+          unzipped backup) to continue where you left off. orgchartr will reject unrelated non-empty
+          folders without changing them.
         </p>
         <p className="storage-gate__muted">
-          Your data never leaves your machine: this page reads and writes the folder directly from
-          the browser and nothing is uploaded to a server.
+          This site receives read/write access to the folder you choose. Your data stays on this
+          machine and is not uploaded to the web host.
         </p>
         {error && <p className="error-text">{error}</p>}
         <div className="storage-gate__actions">

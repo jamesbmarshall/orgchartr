@@ -9,6 +9,10 @@ export function setActiveAdapter(adapter: StorageAdapter): void {
   active = adapter;
 }
 
+export function clearActiveAdapter(): void {
+  active = null;
+}
+
 export function getActiveAdapter(): StorageAdapter {
   if (!active) throw new Error('Storage has not been initialised yet.');
   return active;

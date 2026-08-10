@@ -5,9 +5,19 @@ services:
       dockerfile: Dockerfile
       args:
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
-        VITE_FORCE_LOCAL_MODE: 'true'
+        VITE_STORAGE_MODE: 'local'
     ports:
       # Local-folder mode relies on a browser user gesture, so expose the static app only to this
       # machine. Chart data is read and written by Chromium, never mounted into the container.
       - '127.0.0.1:3000:8080'
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 128m
+    cpus: 0.5
     restart: unless-stopped

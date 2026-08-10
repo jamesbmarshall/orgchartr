@@ -5,8 +5,60 @@
  * server's temp-file+rename pattern.
  */
 
+import { MAX_JSON_FILE_SIZE } from '@orgchartr/shared';
+
 export function isNotFoundError(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'NotFoundError';
+}
+
+const DATA_FOLDER_MARKER = '.orgchartr-data.json';
+const DATA_FOLDER_FORMAT_VERSION = 1;
+const IGNORED_EMPTY_FOLDER_FILES = new Set(['.DS_Store', 'desktop.ini', 'Thumbs.db']);
+
+export type DataFolderKind = 'empty' | 'marked' | 'legacy' | 'unrecognised';
+
+/** Classifies a picked folder without changing it. */
+export async function inspectDataFolder(root: FileSystemDirectoryHandle): Promise<DataFolderKind> {
+  try {
+    const markerFile = await (await root.getFileHandle(DATA_FOLDER_MARKER)).getFile();
+    if (markerFile.size > 4096) throw new Error('The orgchartr folder marker is invalid.');
+    let marker: unknown;
+    try {
+      marker = JSON.parse(await markerFile.text()) as unknown;
+    } catch {
+      throw new Error('The orgchartr folder marker is invalid.');
+    }
+    if (
+      typeof marker !== 'object'
+      || marker === null
+      || (marker as { type?: unknown }).type !== 'orgchartr-data'
+      || (marker as { formatVersion?: unknown }).formatVersion !== DATA_FOLDER_FORMAT_VERSION
+    ) {
+      throw new Error('The orgchartr folder marker is invalid.');
+    }
+    return 'marked';
+  } catch (error) {
+    if (!isNotFoundError(error)) throw error;
+  }
+
+  const entries: string[] = [];
+  for await (const [name] of root.entries()) {
+    if (!IGNORED_EMPTY_FOLDER_FILES.has(name)) entries.push(name);
+  }
+  if (entries.length === 0) return 'empty';
+
+  const charts = await getDir(root, ['charts']);
+  if (charts && (await fileExists(charts, 'index.json')) && (await fileExists(root, 'sponsors.json'))) {
+    return 'legacy';
+  }
+  return 'unrecognised';
+}
+
+export async function markDataFolder(root: FileSystemDirectoryHandle): Promise<void> {
+  await writeJson(root, DATA_FOLDER_MARKER, {
+    type: 'orgchartr-data',
+    formatVersion: DATA_FOLDER_FORMAT_VERSION,
+  });
 }
 
 export async function getDir(
@@ -26,10 +78,15 @@ export async function getDir(
   return dir;
 }
 
-export async function readFileBytes(dir: FileSystemDirectoryHandle, name: string): Promise<Uint8Array | null> {
+export async function readFileBytes(
+  dir: FileSystemDirectoryHandle,
+  name: string,
+  maxBytes = MAX_JSON_FILE_SIZE,
+): Promise<Uint8Array | null> {
   try {
     const handle = await dir.getFileHandle(name);
     const file = await handle.getFile();
+    if (file.size > maxBytes) throw new Error(`${name} is larger than the ${Math.floor(maxBytes / 1024 / 1024)} MB limit.`);
     return new Uint8Array(await file.arrayBuffer());
   } catch (error) {
     if (isNotFoundError(error)) return null;
@@ -41,6 +98,9 @@ export async function readJson<T>(dir: FileSystemDirectoryHandle, name: string, 
   try {
     const handle = await dir.getFileHandle(name);
     const file = await handle.getFile();
+    if (file.size > MAX_JSON_FILE_SIZE) {
+      throw new Error(`${name} is larger than the ${MAX_JSON_FILE_SIZE / 1024 / 1024} MB JSON limit.`);
+    }
     const raw = await file.text();
     if (!raw.trim()) return fallback;
     return JSON.parse(raw) as T;

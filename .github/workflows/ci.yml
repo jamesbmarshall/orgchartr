@@ -5,13 +5,22 @@ on:
     branches: [master]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -25,5 +34,75 @@ jobs:
       - name: Build (type-check both workspaces)
         run: npm run build
 
+      - name: Verify local-only production bundle
+        run: npm run verify:local-bundle
+
       - name: Audit dependencies
         run: npm audit --audit-level=high
+
+      - name: Build and smoke-test hardened container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose up -d --build
+          trap 'docker compose down' EXIT
+
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3000/ >/dev/null; then
+              break
+            fi
+            if [[ "$attempt" == 30 ]]; then
+              docker compose logs
+              exit 1
+            fi
+            sleep 1
+          done
+
+          headers="$(mktemp)"
+          curl --fail --silent --dump-header "$headers" http://127.0.0.1:3000/ >/dev/null
+          grep --ignore-case --quiet '^content-security-policy:' "$headers"
+          grep --ignore-case --quiet '^x-content-type-options: nosniff' "$headers"
+          grep --ignore-case --quiet '^x-frame-options: DENY' "$headers"
+          grep --ignore-case --quiet '^cache-control: no-store' "$headers"
+
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/health)" = 404
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/photos/test.png)" = 404
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/unknown)" = 404
+          test "$(curl --silent --request POST --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/)" = 403
+
+          container_id="$(docker compose ps --quiet app)"
+          test "$(docker inspect --format '{{.Config.User}}' "$container_id")" = '101:101'
+          test "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "$container_id")" = 'true'
+          test "$(docker inspect --format '{{json .HostConfig.CapDrop}}' "$container_id")" = '["ALL"]'
+          docker inspect --format '{{json .HostConfig.SecurityOpt}}' "$container_id" | grep --quiet 'no-new-privileges:true'
+          test "$(docker inspect --format '{{.HostConfig.PidsLimit}}' "$container_id")" = '64'
+          test "$(docker inspect --format '{{json .HostConfig.Binds}}' "$container_id")" = 'null'
+
+          image_id="$(docker compose images --quiet app)"
+          docker tag "$image_id" orgchartr-ci:latest
+
+      - name: Generate container SBOM
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
+        with:
+          scan-type: image
+          image-ref: orgchartr-ci:latest
+          format: cyclonedx
+          output: sbom.cdx.json
+
+      - name: Upload container SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: orgchartr-container-sbom
+          path: sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Scan container for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
+        with:
+          scan-type: image
+          image-ref: orgchartr-ci:latest
+          format: table
+          exit-code: '1'
+          vuln-type: os,library
+          severity: HIGH,CRITICAL

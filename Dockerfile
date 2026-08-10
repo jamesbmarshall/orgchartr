@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
 
 # ---- Stage 1: build the local-folder frontend ----
-FROM node:22-alpine AS build
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS build
 WORKDIR /app
 
 ARG NPM_REGISTRY=https://registry.npmjs.org/
-ARG VITE_FORCE_LOCAL_MODE=true
+ARG VITE_STORAGE_MODE=local
 
 COPY package.json package-lock.json ./
 COPY shared/package.json shared/package.json
@@ -15,14 +15,20 @@ RUN npm ci --registry="$NPM_REGISTRY"
 
 COPY shared ./shared
 COPY frontend ./frontend
+COPY scripts/assert-local-bundle.cjs scripts/assert-local-bundle.cjs
 RUN npm run build -w shared \
-  && VITE_FORCE_LOCAL_MODE="$VITE_FORCE_LOCAL_MODE" npm run build -w frontend
+  && VITE_STORAGE_MODE="$VITE_STORAGE_MODE" npm run build -w frontend \
+  && npm run verify:local-bundle
 
 # ---- Stage 2: static production runtime ----
-FROM nginx:alpine AS runtime
+FROM nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752 AS runtime
 
+COPY docker/nginx-main.conf /etc/nginx/nginx.conf
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker/security-headers.conf /etc/nginx/snippets/orgchartr-security-headers.conf
 COPY --from=build /app/frontend/dist /usr/share/nginx/html
+
+USER 101:101
 
 EXPOSE 8080
 

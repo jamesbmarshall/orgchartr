@@ -1,8 +1,8 @@
 import { create } from 'zustand';
-import { setActiveAdapter } from './active';
-import { serverAdapter } from './serverAdapter';
+import { clearActiveAdapter, setActiveAdapter } from './active';
 import { LocalFolderAdapter } from './localAdapter';
 import { clearDirectoryHandle, loadDirectoryHandle, saveDirectoryHandle } from './handleStore';
+import { inspectDataFolder, markDataFolder } from './fsaFs';
 
 export type StorageStatus =
   /** Deciding between server and local mode. */
@@ -33,13 +33,15 @@ interface StorageState {
   forgetFolder: () => Promise<void>;
   /** Switches to a different folder from within the running app (user gesture). */
   switchFolder: () => Promise<void>;
+  /** Clears the remembered handle and returns to the folder picker without deleting data. */
+  lockFolder: () => Promise<void>;
 }
 
 function supportsFileSystemAccess(): boolean {
   return typeof window !== 'undefined' && 'showDirectoryPicker' in window;
 }
 
-const FORCE_LOCAL = import.meta.env.VITE_FORCE_LOCAL_MODE === 'true';
+const STORAGE_MODE = import.meta.env.VITE_STORAGE_MODE as 'auto' | 'local';
 const PROBE_TIMEOUT_MS = 1500;
 
 /** True when the Express API answers, meaning the app is served by the self-hosted server. */
@@ -61,8 +63,24 @@ async function probeServer(): Promise<boolean> {
 let activeLocalAdapter: LocalFolderAdapter | null = null;
 let initialiseStarted = false;
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
+}
+
 export const useStorageStore = create<StorageState>((set, get) => {
   async function activateLocal(handle: FileSystemDirectoryHandle): Promise<void> {
+    const folderKind = await inspectDataFolder(handle);
+    if (folderKind === 'unrecognised') {
+      throw new Error('Choose a dedicated empty folder or an existing orgchartr data folder. No files were changed.');
+    }
+    if (folderKind === 'legacy') {
+      const confirmed = window.confirm(
+        `"${handle.name}" looks like an existing orgchartr folder. Mark it as an orgchartr data folder and continue?`,
+      );
+      if (!confirmed) throw new DOMException('Folder migration cancelled.', 'AbortError');
+    }
+    if (folderKind === 'empty' || folderKind === 'legacy') await markDataFolder(handle);
+
     const adapter = new LocalFolderAdapter(handle);
     await adapter.initialise();
     await saveDirectoryHandle(handle);
@@ -83,7 +101,8 @@ export const useStorageStore = create<StorageState>((set, get) => {
       if (initialiseStarted) return;
       initialiseStarted = true;
 
-      if (!FORCE_LOCAL && (await probeServer())) {
+      if (STORAGE_MODE === 'auto' && (await probeServer())) {
+        const { serverAdapter } = await import('./serverAdapter');
         setActiveAdapter(serverAdapter);
         set({ status: 'ready', mode: 'server', error: null });
         return;
@@ -105,9 +124,16 @@ export const useStorageStore = create<StorageState>((set, get) => {
           return;
         }
         set({ status: 'local-reopen', rememberedFolderName: remembered.name });
-      } catch {
+      } catch (error) {
+        if (isAbortError(error)) {
+          set({ status: 'local-reopen', rememberedFolderName: remembered.name, error: null });
+          return;
+        }
         await clearDirectoryHandle();
-        set({ status: 'local-picker' });
+        set({
+          status: 'local-picker',
+          error: error instanceof Error ? error.message : 'Could not open the remembered folder.',
+        });
       }
     },
 
@@ -117,7 +143,7 @@ export const useStorageStore = create<StorageState>((set, get) => {
         await activateLocal(handle);
       } catch (err) {
         // AbortError: the user closed the picker; stay where we are.
-        if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (isAbortError(err)) return;
         set({
           status: 'local-picker',
           error: err instanceof Error ? err.message : 'Could not open that folder. Please try another one.',
@@ -158,9 +184,18 @@ export const useStorageStore = create<StorageState>((set, get) => {
         // Data under every route changed wholesale; reload so all stores re-fetch.
         window.location.reload();
       } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (isAbortError(err)) return;
         set({ error: err instanceof Error ? err.message : 'Could not open that folder.' });
       }
+    },
+
+    lockFolder: async () => {
+      if (get().mode !== 'local') return;
+      activeLocalAdapter?.dispose();
+      activeLocalAdapter = null;
+      clearActiveAdapter();
+      await clearDirectoryHandle();
+      window.location.reload();
     },
   };
 });

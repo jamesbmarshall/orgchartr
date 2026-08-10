@@ -5,11 +5,12 @@
  * is directly usable as a data folder. No data ever leaves the browser.
  */
 
-import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
+import { strFromU8, strToU8, unzip, zipSync } from 'fflate';
 import {
   BACKUP_MANIFEST_FILE,
-  MAX_EXPANDED_SIZE,
+  MAX_BROWSER_EXPANDED_SIZE,
   MAX_HISTORY_SNAPSHOTS,
+  MAX_JSON_FILE_SIZE,
   MAX_PACKAGE_ARCHIVE_SIZE,
   MAX_PACKAGE_ENTRIES,
   MAX_PHOTO_SIZE,
@@ -43,6 +44,7 @@ import {
 } from '@orgchartr/shared';
 import type { Chart, ChartHistoryEntry, ChartIndexEntry, Person, Sponsor, SponsorUsageEntry } from '../types';
 import type { StorageAdapter, StorageCapabilities } from './adapter';
+import { normalisePhoto } from '../utils/normalisePhoto';
 import {
   ensureDataDirs,
   fileExists,
@@ -55,6 +57,50 @@ import {
   writeBytes,
   writeJson,
 } from './fsaFs';
+
+function unzipPackageArchive(data: Uint8Array): Promise<Record<string, Uint8Array>> {
+  return new Promise((resolve, reject) => {
+    let entryCount = 0;
+    let expandedSize = 0;
+    const seenPaths = new Set<string>();
+    try {
+      unzip(
+        data,
+        {
+          filter: (entry) => {
+            entryCount += 1;
+            if (entryCount > MAX_PACKAGE_ENTRIES) throw new Error('The package contains too many files.');
+
+            const isDirectory = entry.name.endsWith('/');
+            validatePackageEntryName(entry.name, isDirectory);
+            const canonicalPath = entry.name.replace(/\/$/, '').toLocaleLowerCase();
+            if (seenPaths.has(canonicalPath)) throw new Error(`Duplicate package path: ${entry.name}`);
+            seenPaths.add(canonicalPath);
+
+            if (!Number.isSafeInteger(entry.originalSize) || entry.originalSize < 0) {
+              throw new Error(`The package has an invalid file size: ${entry.name}`);
+            }
+            const entryLimit = entry.name.startsWith('assets/photos/') ? MAX_PHOTO_SIZE : MAX_JSON_FILE_SIZE;
+            if (!isDirectory && entry.originalSize > entryLimit) {
+              throw new Error(`The package entry is too large: ${entry.name}`);
+            }
+            expandedSize += entry.originalSize;
+            if (!Number.isSafeInteger(expandedSize) || expandedSize > MAX_BROWSER_EXPANDED_SIZE) {
+              throw new Error('The expanded package is too large for browser import.');
+            }
+            return true;
+          },
+        },
+        (error, entries) => {
+          if (error) reject(error);
+          else resolve(entries);
+        },
+      );
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
 
 function assertChartId(id: string): void {
   if (!isValidChartId(id)) throw new Error('Invalid chart id');
@@ -115,8 +161,12 @@ export class LocalFolderAdapter implements StorageAdapter {
     return dir;
   }
 
-  private async requireFileBytes(dir: FileSystemDirectoryHandle, name: string): Promise<Uint8Array> {
-    const data = await readFileBytes(dir, name);
+  private async requireFileBytes(
+    dir: FileSystemDirectoryHandle,
+    name: string,
+    maxBytes = MAX_JSON_FILE_SIZE,
+  ): Promise<Uint8Array> {
+    const data = await readFileBytes(dir, name, maxBytes);
     if (!data) throw new Error(`The data file disappeared while it was being read: ${name}`);
     return data;
   }
@@ -214,6 +264,7 @@ export class LocalFolderAdapter implements StorageAdapter {
       if (!photos) return;
       try {
         const file = await (await photos.getFileHandle(name)).getFile();
+        if (file.size > MAX_PHOTO_SIZE) throw new Error(`Stored photo exceeds the 5 MB limit: ${name}`);
         this.photoUrls.set(name, URL.createObjectURL(file));
       } catch (error) {
         if (!isNotFoundError(error)) throw error;
@@ -223,11 +274,13 @@ export class LocalFolderAdapter implements StorageAdapter {
   }
 
   private async writePhoto(data: Uint8Array): Promise<string> {
-    const ext = sniffImageExtension(data);
-    if (!ext) throw new Error('Unsupported file type. Use JPEG, PNG, WEBP, or GIF.');
-    const filename = `${randomId(12)}${ext}`;
-    await writeBytes(await this.photosDir(), filename, data);
-    this.photoUrls.set(filename, URL.createObjectURL(new Blob([data as BlobPart])));
+    const normalised = await normalisePhoto(data);
+    const filename = `${randomId(12)}${normalised.extension}`;
+    await writeBytes(await this.photosDir(), filename, normalised.data);
+    this.photoUrls.set(
+      filename,
+      URL.createObjectURL(new Blob([normalised.data as BlobPart], { type: normalised.mimeType })),
+    );
     return filename;
   }
 
@@ -512,7 +565,7 @@ export class LocalFolderAdapter implements StorageAdapter {
       files[PACKAGE_CHART_FILE] = strToU8(`${JSON.stringify(packagedChart, null, 2)}\n`);
       files[PACKAGE_SPONSORS_FILE] = strToU8(`${JSON.stringify(sponsors, null, 2)}\n`);
       for (const photo of photos) {
-        files[`assets/photos/${photo}`] = await this.requireFileBytes(photosDir, photo);
+        files[`assets/photos/${photo}`] = await this.requireFileBytes(photosDir, photo, MAX_PHOTO_SIZE);
       }
       return new Blob([zipSync(files) as BlobPart], { type: 'application/zip' });
     });
@@ -525,8 +578,10 @@ export class LocalFolderAdapter implements StorageAdapter {
       }
       let entries: Record<string, Uint8Array>;
       try {
-        entries = unzipSync(new Uint8Array(await file.arrayBuffer()));
-      } catch {
+        entries = await unzipPackageArchive(new Uint8Array(await file.arrayBuffer()));
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith('The package')) throw error;
+        if (error instanceof Error && error.message.startsWith('Duplicate package path:')) throw error;
         throw new Error('That file is not a valid chart package.');
       }
 
@@ -536,18 +591,12 @@ export class LocalFolderAdapter implements StorageAdapter {
       let sponsorsSaved = false;
       try {
         const names = Object.keys(entries);
-        if (names.length > MAX_PACKAGE_ENTRIES) throw new Error('The package contains too many files.');
         const seenPaths = new Set<string>();
-        let expandedSize = 0;
         for (const name of names) {
           validatePackageEntryName(name, name.endsWith('/'));
           const canonicalPath = name.replace(/\/$/, '').toLocaleLowerCase();
           if (seenPaths.has(canonicalPath)) throw new Error(`Duplicate package path: ${name}`);
           seenPaths.add(canonicalPath);
-          expandedSize += entries[name].length;
-          if (!Number.isSafeInteger(expandedSize) || expandedSize > MAX_EXPANDED_SIZE) {
-            throw new Error('The expanded package is too large.');
-          }
         }
         if (![PACKAGE_MANIFEST_FILE, PACKAGE_CHART_FILE, PACKAGE_SPONSORS_FILE].every((name) => seenPaths.has(name))) {
           throw new Error('This file does not look like an orgchartr chart package.');
@@ -664,7 +713,7 @@ export class LocalFolderAdapter implements StorageAdapter {
       const photos = await getDir(this.root, ['assets', 'photos']);
       if (photos) {
         for (const name of await listFiles(photos)) {
-          files[`assets/photos/${name}`] = await this.requireFileBytes(photos, name);
+          files[`assets/photos/${name}`] = await this.requireFileBytes(photos, name, MAX_PHOTO_SIZE);
         }
       }
       return new Blob([zipSync(files) as BlobPart], { type: 'application/zip' });

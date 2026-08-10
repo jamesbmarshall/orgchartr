@@ -11,6 +11,7 @@ export function Dashboard() {
   const { index, indexLoading, indexError, loadIndex, createChart, deleteChart } = useChartStore();
   const { scheduleDelete } = useUndoStore();
   const switchFolder = useStorageStore((state) => state.switchFolder);
+  const lockFolder = useStorageStore((state) => state.lockFolder);
   const isLocalMode = api.mode === 'local';
   const navigate = useNavigate();
   const [newPartnerName, setNewPartnerName] = useState('');
@@ -132,6 +133,9 @@ export function Dashboard() {
               {api.folderName}
               <button type="button" onClick={() => void switchFolder()}>
                 Switch folder…
+              </button>
+              <button type="button" onClick={() => void lockFolder()}>
+                Lock and forget
               </button>
             </span>
           )}

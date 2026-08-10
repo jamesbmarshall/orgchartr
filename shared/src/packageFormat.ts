@@ -16,6 +16,8 @@ export const PACKAGE_FORMAT_VERSION = 1;
 export const MAX_PACKAGE_ARCHIVE_SIZE = 100 * 1024 * 1024;
 export const MAX_PACKAGE_ENTRIES = 10_000;
 export const MAX_EXPANDED_SIZE = 500 * 1024 * 1024;
+/** Lower in-browser ceiling: the server has a larger memory budget than a browser tab. */
+export const MAX_BROWSER_EXPANDED_SIZE = 100 * 1024 * 1024;
 
 export interface PackageManifest {
   formatVersion: number;

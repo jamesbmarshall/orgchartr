@@ -2,6 +2,18 @@
  * Minimal RFC4180-style CSV parser: handles quoted fields, embedded commas,
  * embedded newlines within quotes, and "" as an escaped quote.
  */
+const SPREADSHEET_FORMULA_PREFIX = /^[=+\-@\t\r]/;
+
+export function escapeSpreadsheetFormula(value: string): string {
+  if (/^'[=+\-@\t\r]/.test(value)) return `'${value}`;
+  return SPREADSHEET_FORMULA_PREFIX.test(value) ? `'${value}` : value;
+}
+
+export function restoreSpreadsheetFormulaEscape(value: string): string {
+  if (/^''[=+\-@\t\r]/.test(value)) return value.slice(1);
+  return /^'[=+\-@\t\r]/.test(value) ? value.slice(1) : value;
+}
+
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];

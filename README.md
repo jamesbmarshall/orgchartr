@@ -35,7 +35,9 @@ That's the whole setup. Docker only serves the app; your browser reads and write
 
 Open **http://localhost:3000** in Chrome or Edge and choose a folder when prompted. Pick an empty folder to start fresh, an existing orgchartr data folder to continue, or a folder containing an unzipped backup. The browser remembers the folder handle but may ask you to confirm access again on a later visit.
 
-Docker never mounts or reads this folder. Use **Switch folder…** on the dashboard to change it without restarting the container.
+Docker never mounts or reads this folder. Use **Switch folder…** on the dashboard to change it without restarting the container, or **Lock and forget** to clear the remembered folder handle from orgchartr. Browser site settings remain the authoritative place to revoke a persistent folder permission.
+
+Use a dedicated folder for orgchartr. The app marks empty folders when first opened and rejects unrelated non-empty folders before writing anything. Existing orgchartr folders and unzipped backups require a one-time confirmation before they are marked.
 
 If the browser asks again later, select **Reopen folder** and approve access. Cancelling the prompt or choosing a different folder does not delete the original files.
 
@@ -125,6 +127,16 @@ npm run build -w frontend
 ```
 
 Serve the output over HTTPS (or localhost), because browser folder access requires a secure context. If you host under a sub-path, set Vite's [`base`](https://vite.dev/config/shared-options.html#base) accordingly.
+
+For a public deployment:
+
+- Publish only the static local-folder build. Do not expose the Express development server or add a data volume.
+- Terminate TLS at a trusted ingress or static host, redirect HTTP to HTTPS, and enable HSTS after HTTPS is verified.
+- Preserve the response headers and static route allowlist in `docker/nginx.conf`. `/api/*`, `/photos/*`, unknown paths, and non-read methods must remain unavailable.
+- Treat control of the web origin and deployment pipeline as access to any folder a returning browser permits the app to open. Restrict release access, pin dependencies and container images, and scan each release.
+- Set a short retention period for ingress and container access logs. The included nginx format omits query strings, referrers, and user agents.
+
+See [SECURITY.md](SECURITY.md) for the complete supported deployment boundary and operator checklist.
 
 ## Network access
 

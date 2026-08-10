@@ -2,6 +2,7 @@ import type { Person, Sponsor } from '../types';
 import { computeAutoLayout, NODE_HEIGHT, personNodeWidth } from '../layout/autoLayout';
 import { photoUrl } from '../api/client';
 import { colorLegendEntries, readableTextColor } from './personColors';
+import { escapeSpreadsheetFormula } from './csv';
 
 export type ExportFormat = 'svg' | 'png' | 'csv' | 'json' | 'package';
 
@@ -305,7 +306,8 @@ export async function svgToPngBlob(svg: string): Promise<Blob> {
 }
 
 function csvCell(value: string): string {
-  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  const safeValue = escapeSpreadsheetFormula(value);
+  return /[",\n]/.test(safeValue) ? `"${safeValue.replace(/"/g, '""')}"` : safeValue;
 }
 
 export function buildCsv(people: Person[], sponsorById: Map<string, Sponsor>): string {

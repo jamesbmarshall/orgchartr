@@ -5,6 +5,8 @@ export const MAX_HISTORY_SNAPSHOTS = 30;
 
 /** Maximum accepted photo upload size in bytes. */
 export const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+/** Maximum JSON data file size read into memory by the browser adapter. */
+export const MAX_JSON_FILE_SIZE = 10 * 1024 * 1024;
 
 /** Whole-install backup archive format (layout mirrors the data directory exactly). */
 export const BACKUP_MANIFEST_FILE = 'orgchartr-backup.json';

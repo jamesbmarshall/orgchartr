@@ -13,6 +13,7 @@
     "dev:frontend": "npm run dev -w frontend",
     "build": "npm run build -w shared && npm run build -w frontend && npm run build -w server",
     "build:shared": "npm run build -w shared",
+    "verify:local-bundle": "node scripts/assert-local-bundle.cjs",
     "start": "npm run start -w server"
   },
   "overrides": {

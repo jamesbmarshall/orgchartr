@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent } from 'react';
 import type { Person, Sponsor } from '../types';
-import { parseCsv } from '../utils/csv';
+import { parseCsv, restoreSpreadsheetFormulaEscape } from '../utils/csv';
 import { useModalDialog } from '../hooks/useModalDialog';
 
 interface ImportModalProps {
@@ -26,6 +26,7 @@ interface ImportRow {
 }
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+const MAX_CSV_IMPORT_SIZE = 5 * 1024 * 1024;
 
 function parseRows(text: string): ImportRow[] {
   const rows = parseCsv(text);
@@ -43,7 +44,9 @@ function parseRows(text: string): ImportRow[] {
   const edgeColorIdx = col('Edge colour');
   const backgroundColorIdx = col('Background colour');
 
-  const cell = (row: string[], idx: number) => (idx >= 0 ? (row[idx] ?? '').trim() : '');
+  const cell = (row: string[], idx: number) => (
+    idx >= 0 ? restoreSpreadsheetFormulaEscape((row[idx] ?? '').trim()) : ''
+  );
 
   return dataRows
     .map((row) => ({
@@ -92,6 +95,7 @@ export function ImportModal({ people, sponsors, onAddPerson, onUpdatePerson, onC
     setError(null);
     setSummary(null);
     try {
+      if (file.size > MAX_CSV_IMPORT_SIZE) throw new Error('The CSV file is larger than the 5 MB limit.');
       const text = await file.text();
       const parsed = parseRows(text);
       if (parsed.length === 0) {
@@ -102,8 +106,8 @@ export function ImportModal({ people, sponsors, onAddPerson, onUpdatePerson, onC
       }
       setFileName(file.name);
       setRows(parsed);
-    } catch {
-      setError('Could not read that file.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not read that file.');
     }
   }
 
