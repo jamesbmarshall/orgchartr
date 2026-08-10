@@ -10,7 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@orgchartr/shared": "*",
     "@xyflow/react": "^12.3.6",
+    "fflate": "^0.8.2",
     "lucide-react": "^1.27.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

@@ -1,0 +1,21 @@
+{
+  "name": "@orgchartr/shared",
+  "private": true,
+  "version": "1.0.0",
+  "type": "commonjs",
+  "main": "./dist/cjs/index.js",
+  "types": "./dist/cjs/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/cjs/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.cjs.json && tsc -p tsconfig.esm.json && node write-dist-manifests.cjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

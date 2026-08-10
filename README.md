@@ -10,7 +10,7 @@ New here? Start with the plain-English [**Getting started guide**](docs/GETTING-
 - Each person carries a title, department, tags, a photo, free-text **notes** (decisions they own, how they like to be contacted, anything worth remembering), and links to one or more sponsors.
 - A shared, reusable sponsor directory you can link to any person on any chart.
 - Export a whole chart, or chosen branches and people, as SVG, PNG, CSV, or JSON.
-- Runs locally in Docker with no cloud hosting and no accounts to create.
+- Runs as a static site in Docker or on any web host; the app works entirely in your browser against a folder on your computer.
 - Stores its data in a folder you choose. The app never uploads, syncs, or backs up that folder for you.
 
 ## Quickstart
@@ -20,64 +20,26 @@ New here? Start with the plain-English [**Getting started guide**](docs/GETTING-
    ```
    docker compose up -d --build
    ```
-3. **Open it** at **http://localhost:3000**.
+3. **Open it in Chrome or Edge** at **http://localhost:3000**, choose a data folder, and grant read/write access.
 
-That's the whole setup. To stop it later, run `docker compose down` (your data folder is left untouched).
+That's the whole setup. Docker only serves the app; your browser reads and writes the folder directly. To stop it later, run `docker compose down` (your data folder is left untouched).
 
 > **It runs on this computer only.** orgchartr has no login, so it is deliberately reachable only from the machine it runs on — not from anyone else on your network. See [Exposing it on a network](#exposing-it-on-a-network-advanced) if you genuinely need otherwise.
 
 ## Requirements
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or another Docker Engine + Compose setup). Nothing else — you don't need Node.js or any developer tools to run it.
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or another Docker Engine + Compose setup).
+- A Chromium-based browser such as Chrome or Edge. Firefox and Safari do not support choosing a local folder.
 
 ## Choosing where your data is stored
 
-By default, data lives in an ignored `data/` folder beside this README. To keep it somewhere you control — for example a OneDrive folder so it's backed up — pick that folder once:
+Open **http://localhost:3000** in Chrome or Edge and choose a folder when prompted. Pick an empty folder to start fresh, an existing orgchartr data folder to continue, or a folder containing an unzipped backup. The browser remembers the folder handle but may ask you to confirm access again on a later visit.
 
-- **Windows (PowerShell):**
-  ```powershell
-  ./scripts/select-data-directory.ps1
-  docker compose up -d --build
-  ```
-- **macOS / Linux:**
-  ```bash
-  ./scripts/select-data-directory.sh
-  docker compose up -d --build
-  ```
-
-The picker writes your choice as `ORGCHARTR_DATA_DIR` into the repository's ignored `.env` file. You can also set it by hand — use forward slashes on Windows paths and quote paths containing spaces:
-
-```dotenv
-ORGCHARTR_DATA_DIR="C:/Users/your-name/OneDrive/orgchartr-data"
-```
-
-Docker mounts only this one folder into the app at `/app/data`. The app can't change the path while it's running; re-run the picker and restart to switch folders.
+Docker never mounts or reads this folder. Use **Switch folder…** on the dashboard to change it without restarting the container.
 
 ### Moving existing data to a new folder
 
-Stop the app, copy the data across, select the new folder, and restart. For example on macOS/Linux:
-
-```bash
-docker compose down
-dest="$HOME/OneDrive/orgchartr-data"
-mkdir -p "$dest"
-cp -R ./data/charts ./data/assets ./data/sponsors.json "$dest"/
-./scripts/select-data-directory.sh   # choose "$dest"
-docker compose up -d --build
-```
-
-The Windows equivalent using the PowerShell picker:
-
-```powershell
-docker compose down
-$destination = "$HOME/OneDrive/orgchartr-data"
-New-Item -ItemType Directory -Force $destination
-Copy-Item ./data/charts, ./data/assets, ./data/sponsors.json -Destination $destination -Recurse
-./scripts/select-data-directory.ps1
-docker compose up -d --build
-```
-
-Only one running orgchartr container may own a given data folder. Don't point two containers at the same OneDrive/Dropbox/SMB folder — share or move an exported ZIP (below) instead.
+Close orgchartr tabs that have the old folder open, copy the folder using Explorer or Finder, then use **Switch folder…** and choose the copy. Do not edit the same folder from multiple orgchartr tabs or devices at once.
 
 ## How your data is stored
 
@@ -102,7 +64,7 @@ orgchartr holds **real names and job details of people who work at partner organ
 ## Backups and portability
 
 - **One chart:** open a chart, choose **Export → Portable package (ZIP)**. The ZIP contains the selected people, their sponsor links, referenced sponsors, and photos. Use **Import chart package** on the dashboard to add it elsewhere without disturbing existing data.
-- **The whole installation:** use **Export backup** on the dashboard for a single ZIP of all charts, history, sponsors, and photos. **Restore from backup** replaces everything in another orgchartr installation with that copy.
+- **The whole installation:** use **Export backup** on the dashboard for a single ZIP of all charts, history, sponsors, and photos. To restore it, unzip the archive and open that folder in orgchartr.
 
 The in-app ZIP is a point-in-time copy, not an off-device backup service. OneDrive sync gives you another copy of the live folder, but sync also propagates deletions and corruption — keep exported backups as well.
 
@@ -123,15 +85,36 @@ Photos are embedded in SVG and PNG exports. Portable packages include referenced
 ## Troubleshooting
 
 - **"docker: command not found" or the app won't start.** Docker Desktop isn't running. Start it and wait for its status to show *Running*, then try `docker compose up -d --build` again.
+- **npmjs.org is blocked on a managed device.** Docker does not inherit npm's host configuration. Add `NPM_REGISTRY=https://your-company-package-feed/npm/` to the ignored `.env` file, then rebuild. The registry must mirror every version in `package-lock.json`.
 - **Port 3000 is already in use.** Something else is using that port. Stop the other program, or change the published port in `docker-compose.yml` (for example `127.0.0.1:3001:3000`) and open http://localhost:3001 instead.
 - **The page is blank or won't load.** Give it a few seconds after `up` for the container to start, then refresh. Check it's running with `docker compose ps`; view logs with `docker compose logs -f`.
-- **Where's my data?** In the folder shown by `ORGCHARTR_DATA_DIR` in `.env`, or the default `./data` folder if you haven't set one.
-- **(Linux) Charts won't save / the app looks read-only.** The container runs as a non-root user (uid 1000), so it needs write access to your data folder. Make it writable with `sudo chown -R 1000:1000 /path/to/your/data-folder` (Docker Desktop on Windows and macOS handles this automatically).
+- **Where's my data?** In the folder shown on the dashboard. Docker has no access to it; Chrome or Edge reads and writes it directly.
+- **The folder picker does not appear.** Open the app in Chrome or Edge at `http://localhost:3000`. Local folder access requires a Chromium browser and a secure context such as localhost.
 - **Start fresh.** `docker compose down` stops everything; your data folder is never deleted by removing or rebuilding the container.
 
-## Exposing it on a network (advanced)
+## Static hosting: no install, data still on your computer (advanced)
 
-By default the app is published on `127.0.0.1:3000`, so only this machine can reach it. orgchartr has **no authentication** — anyone who can reach the port has full access to every stakeholder record and can delete or replace all data. If you understand that and still want LAN access, change the `ports` entry in `docker-compose.yml` from `127.0.0.1:3000:3000` to `3000:3000` and rebuild. On a Linux host, remember that Docker's firewall rules can bypass `ufw`.
+orgchartr can also be hosted as a **static website** — no Docker, no server-side storage, nothing to install. In this mode the app runs entirely in your browser: on first visit it asks you to pick a folder on your computer, then reads and writes your charts, sponsors, and photos directly in that folder using the browser's File System Access API. **No chart data is ever uploaded to the server hosting the page** — the host only serves the app's HTML/JS/CSS.
+
+Good to know about hosted mode:
+
+- **Browser support.** Picking a local folder requires a Chromium-based browser (Chrome, Edge, Opera). Firefox and Safari can't grant folder access; the app shows a clear message instead.
+- **Same folder, either mode.** The folder layout is identical to the Docker version's data folder. You can open a Docker data folder in hosted mode, point Docker at a folder created in hosted mode, or unzip an exported backup and open that folder. Don't do both *at the same time* against one folder.
+- **Permissions.** The browser remembers your folder between visits, but may ask you to confirm access again when you return (one click). Chrome/Edge offer "Allow on every visit" to skip even that.
+- **Backups.** In hosted mode your folder *is* your data: copying it is a complete backup. **Export backup** still produces the same ZIP as the Docker version; restoring one is just "unzip it and open that folder". Chart packages import/export work as normal.
+
+To deploy it yourself, build the frontend with the local-only flag and publish `frontend/dist/` on any static host:
+
+```bash
+npm install
+VITE_FORCE_LOCAL_MODE=true npm run build
+```
+
+The Docker image uses this flag by default. If you host under a sub-path, set Vite's [`base`](https://vite.dev/config/shared-options.html#base) accordingly.
+
+## Network access
+
+The Docker app is deliberately published only on `127.0.0.1`. File System Access requires a secure browser context; plain HTTP from another machine on the LAN does not qualify. Use a properly configured HTTPS static host for shared deployment rather than exposing the local Docker port.
 
 ## For developers
 
@@ -147,7 +130,8 @@ npm run dev
 This runs the Express API on port 3001 and the Vite dev server (with hot reload) on 5173, proxying `/api` and `/photos` to the API. Open **http://localhost:5173**. Set `DATA_DIR` before `npm run dev` to use a folder other than `./data`.
 
 ```
-frontend/   React + TypeScript + React Flow canvas UI
+shared/     Pure TypeScript domain logic + types used by both frontend and server
+frontend/   React + TypeScript + React Flow canvas UI (server mode + local-folder mode)
 server/     Express + TypeScript API, reads/writes DATA_DIR
 docs/       Getting-started and "why" guides
 scripts/    Data-folder pickers (Windows and macOS/Linux)

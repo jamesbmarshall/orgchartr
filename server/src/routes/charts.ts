@@ -1,5 +1,12 @@
 import { Router } from 'express';
-import { nanoid } from 'nanoid';
+import {
+  ValidationError,
+  applyPersonPatch,
+  applyPositions,
+  buildPerson,
+  removePersonWithReparent,
+  uniqueChartId,
+} from '@orgchartr/shared';
 import {
   readIndex,
   loadChart,
@@ -10,51 +17,15 @@ import {
   restoreChartFromHistory,
   isValidChartId,
 } from '../lib/dataStore';
-import type { Chart, Person } from '../types';
-import { isStoredPhotoName } from '../lib/images';
-import { ValidationError, requireNonEmptyString, requireString, requireStringArray, requirePosition } from '../lib/validation';
+import type { Chart } from '../types';
 
 const router = Router();
-
-/** null (photo cleared) or a safe stored photo filename; anything else is rejected. */
-function parsePhotoField(value: unknown): string | null {
-  if (value === null || value === undefined) return null;
-  if (!isStoredPhotoName(value)) throw new ValidationError('photo must be a valid uploaded photo reference');
-  return value;
-}
 
 // Reject any chart id that isn't a plain slug/nanoid segment before it reaches the filesystem.
 router.param('id', (_req, res, next, id) => {
   if (!isValidChartId(id)) return res.status(400).json({ error: 'Invalid chart id' });
   next();
 });
-
-function slugify(name: string): string {
-  const base = name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-  return base || 'chart';
-}
-
-/** Returns true if `candidateId` is `personId` itself or a descendant of it (would create a cycle). */
-function isSelfOrDescendant(people: Person[], personId: string, candidateId: string): boolean {
-  if (personId === candidateId) return true;
-  const children = people.filter((p) => p.managerId === personId);
-  return children.some((c) => isSelfOrDescendant(people, c.id, candidateId));
-}
-
-function parseColorField(value: unknown): string | null {
-  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : null;
-}
-
-/** Bound stored free-text notes so a bad client can't bloat chart files. */
-const MAX_NOTES_LENGTH = 4000;
-
-function parseNotesField(value: unknown): string {
-  return typeof value === 'string' ? value.trim().slice(0, MAX_NOTES_LENGTH) : '';
-}
 
 // GET /api/charts - index of all charts
 router.get('/', (_req, res) => {
@@ -67,11 +38,8 @@ router.post('/', (req, res) => {
   if (!partnerName || typeof partnerName !== 'string' || !partnerName.trim()) {
     return res.status(400).json({ error: 'partnerName is required' });
   }
-  let id = slugify(partnerName);
-  const index = readIndex();
-  if (index.some((e) => e.id === id)) {
-    id = `${id}-${nanoid(5).toLowerCase()}`;
-  }
+  const existingIds = new Set(readIndex().map((e) => e.id));
+  const id = uniqueChartId(partnerName, existingIds);
   const chart: Chart = { id, partnerName: partnerName.trim(), description: '', people: [] };
   saveChart(chart);
   res.status(201).json(chart);
@@ -133,19 +101,7 @@ router.patch('/:id/positions', (req, res) => {
   if (!positions || typeof positions !== 'object') {
     return res.status(400).json({ error: 'positions must be an object of personId -> {x, y}' });
   }
-  const now = new Date().toISOString();
-  for (const person of chart.people) {
-    const pos = (positions as Record<string, unknown>)[person.id];
-    if (
-      pos &&
-      typeof pos === 'object' &&
-      typeof (pos as { x?: unknown }).x === 'number' &&
-      typeof (pos as { y?: unknown }).y === 'number'
-    ) {
-      person.position = { x: (pos as { x: number }).x, y: (pos as { y: number }).y };
-      person.updatedAt = now;
-    }
-  }
+  applyPositions(chart, positions as Record<string, unknown>, new Date().toISOString());
   saveChart(chart);
   res.json(chart);
 });
@@ -155,31 +111,9 @@ router.post('/:id/people', (req, res) => {
   const chart = loadChart(req.params.id);
   if (!chart) return res.status(404).json({ error: 'Chart not found' });
 
-  const { name, title, department, photo, managerId, sponsorIds, tags, edgeColor, backgroundColor, colorLabel, notes } = req.body ?? {};
-  if (managerId && !chart.people.some((p) => p.id === managerId)) {
-    return res.status(400).json({ error: 'managerId does not exist in this chart' });
-  }
-
-  let person: Person;
+  let person;
   try {
-    const now = new Date().toISOString();
-    person = {
-      id: nanoid(10),
-      name: requireNonEmptyString(name, 'name'),
-      title: title === undefined ? '' : requireString(title, 'title'),
-      department: department === undefined ? '' : requireString(department, 'department'),
-      photo: parsePhotoField(photo),
-      managerId: managerId ?? null,
-      sponsorIds: sponsorIds === undefined ? [] : requireStringArray(sponsorIds, 'sponsorIds'),
-      tags: tags === undefined ? [] : requireStringArray(tags, 'tags'),
-      edgeColor: parseColorField(edgeColor),
-      backgroundColor: parseColorField(backgroundColor),
-      colorLabel: typeof colorLabel === 'string' ? colorLabel.trim() : '',
-      notes: parseNotesField(notes),
-      position: null,
-      createdAt: now,
-      updatedAt: now,
-    };
+    person = buildPerson(req.body ?? {}, chart.people, new Date().toISOString());
   } catch (err) {
     if (err instanceof ValidationError) return res.status(400).json({ error: err.message });
     throw err;
@@ -196,36 +130,12 @@ router.put('/:id/people/:personId', (req, res) => {
   const person = chart.people.find((p) => p.id === req.params.personId);
   if (!person) return res.status(404).json({ error: 'Person not found' });
 
-  const { name, title, department, photo, managerId, sponsorIds, tags, edgeColor, backgroundColor, colorLabel, notes, position } = req.body ?? {};
-
-  if (managerId !== undefined) {
-    if (managerId !== null) {
-      if (!chart.people.some((p) => p.id === managerId)) {
-        return res.status(400).json({ error: 'managerId does not exist in this chart' });
-      }
-      if (isSelfOrDescendant(chart.people, person.id, managerId)) {
-        return res.status(400).json({ error: 'Cannot set manager to self or a descendant (would create a cycle)' });
-      }
-    }
-    person.managerId = managerId;
-  }
   try {
-    if (name !== undefined) person.name = requireNonEmptyString(name, 'name');
-    if (title !== undefined) person.title = requireString(title, 'title');
-    if (department !== undefined) person.department = requireString(department, 'department');
-    if (photo !== undefined) person.photo = parsePhotoField(photo);
-    if (sponsorIds !== undefined) person.sponsorIds = requireStringArray(sponsorIds, 'sponsorIds');
-    if (tags !== undefined) person.tags = requireStringArray(tags, 'tags');
-    if (colorLabel !== undefined) person.colorLabel = requireString(colorLabel, 'colorLabel').trim();
-    if (notes !== undefined) person.notes = parseNotesField(notes);
-    if (position !== undefined) person.position = requirePosition(position);
+    applyPersonPatch(chart, person, req.body ?? {}, new Date().toISOString());
   } catch (err) {
     if (err instanceof ValidationError) return res.status(400).json({ error: err.message });
     throw err;
   }
-  if (edgeColor !== undefined) person.edgeColor = parseColorField(edgeColor);
-  if (backgroundColor !== undefined) person.backgroundColor = parseColorField(backgroundColor);
-  person.updatedAt = new Date().toISOString();
 
   saveChart(chart);
   res.json(person);
@@ -235,18 +145,8 @@ router.put('/:id/people/:personId', (req, res) => {
 router.delete('/:id/people/:personId', (req, res) => {
   const chart = loadChart(req.params.id);
   if (!chart) return res.status(404).json({ error: 'Chart not found' });
-  const person = chart.people.find((p) => p.id === req.params.personId);
-  if (!person) return res.status(404).json({ error: 'Person not found' });
-
-  // Reparent direct subordinates to the deleted person's manager (or make them roots).
-  const now = new Date().toISOString();
-  chart.people.forEach((p) => {
-    if (p.managerId === person.id) {
-      p.managerId = person.managerId;
-      p.updatedAt = now;
-    }
-  });
-  chart.people = chart.people.filter((p) => p.id !== person.id);
+  const found = removePersonWithReparent(chart, req.params.personId, new Date().toISOString());
+  if (!found) return res.status(404).json({ error: 'Person not found' });
   saveChart(chart);
   garbageCollectPhotos();
   res.status(204).end();

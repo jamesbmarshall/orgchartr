@@ -886,3 +886,63 @@ textarea {
   color: var(--success, #4caf50);
   font-size: 0.85rem;
 }
+
+.storage-gate {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.storage-gate__panel {
+  max-width: 480px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.storage-gate__panel h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.storage-gate__panel p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.storage-gate__muted {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.storage-gate__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.storage-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.storage-mode button {
+  font-size: 0.85rem;
+  padding: 0.2rem 0.6rem;
+}
+
+.page__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}

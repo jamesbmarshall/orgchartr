@@ -3,15 +3,20 @@
   "private": true,
   "version": "1.0.0",
   "workspaces": [
+    "shared",
     "frontend",
     "server"
   ],
   "scripts": {
-    "dev": "concurrently -k -n SERVER,FRONTEND -c blue,green \"npm:dev:server\" \"npm:dev:frontend\"",
+    "dev": "npm run build -w shared && concurrently -k -n SERVER,FRONTEND -c blue,green \"npm:dev:server\" \"npm:dev:frontend\"",
     "dev:server": "npm run dev -w server",
     "dev:frontend": "npm run dev -w frontend",
-    "build": "npm run build -w frontend && npm run build -w server",
+    "build": "npm run build -w shared && npm run build -w frontend && npm run build -w server",
+    "build:shared": "npm run build -w shared",
     "start": "npm run start -w server"
+  },
+  "overrides": {
+    "nanoid": "6.0.0"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

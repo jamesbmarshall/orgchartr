@@ -3,22 +3,21 @@ import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
 import AdmZip from 'adm-zip';
+import {
+  BACKUP_FORMAT_VERSION,
+  BACKUP_MANIFEST_FILE,
+  BACKUP_SECTIONS,
+  buildBackupManifest,
+  type BackupManifest,
+} from '@orgchartr/shared';
 import { DATA_DIR, CHARTS_DIR, PHOTOS_DIR, SPONSORS_FILE, ensureDataDirs } from '../lib/dataStore';
 
 const router = Router();
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
-const MANIFEST_FILE = 'orgchartr-backup.json';
-const BACKUP_FORMAT_VERSION = 1;
+const MANIFEST_FILE = BACKUP_MANIFEST_FILE;
 const MAX_BACKUP_ENTRIES = 10_000;
 const MAX_EXPANDED_SIZE = 500 * 1024 * 1024;
-const BACKUP_SECTIONS = ['charts', 'sponsors', 'photos'];
-
-interface BackupManifest {
-  formatVersion: number;
-  createdAt: string;
-  sections: string[];
-}
 
 function validateManifest(manifest: Partial<BackupManifest>): void {
   if (manifest.formatVersion !== BACKUP_FORMAT_VERSION) {
@@ -151,11 +150,7 @@ function replaceLiveData(stagingDir: string): void {
 // GET /api/backup - download a single zip archive with all charts, sponsors, and photos.
 router.get('/', (_req, res) => {
   const zip = new AdmZip();
-  const manifest: BackupManifest = {
-    formatVersion: BACKUP_FORMAT_VERSION,
-    createdAt: new Date().toISOString(),
-    sections: BACKUP_SECTIONS,
-  };
+  const manifest = buildBackupManifest();
   zip.addFile(MANIFEST_FILE, Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, 'utf-8'));
   zip.addLocalFolder(CHARTS_DIR, 'charts');
   zip.addLocalFolder(PHOTOS_DIR, 'assets/photos');
