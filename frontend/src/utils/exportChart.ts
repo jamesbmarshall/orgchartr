@@ -153,7 +153,8 @@ export async function buildSvg(
   const maxX = Math.max(...placed.map((n) => n.x + personNodeWidth(n.person.name)));
   const maxY = Math.max(...placed.map((n) => n.y + NODE_HEIGHT));
   const offsetX = MARGIN - minX;
-  const offsetY = MARGIN + TITLE_HEIGHT - minY;
+  const headingHeight = framed ? 0 : TITLE_HEIGHT;
+  const offsetY = MARGIN + headingHeight - minY;
   const legendEntries = colorLegendEntries(people);
   const legendHeight = legendEntries.length > 0 ? 34 + legendEntries.length * LEGEND_ROW_HEIGHT : 0;
   const legendWidth = legendEntries.length > 0
@@ -167,7 +168,7 @@ export async function buildSvg(
     maxX - minX + MARGIN * 2,
     framed ? framedFooterWidth : cleanFooterWidth,
   );
-  const chartHeight = maxY - minY + MARGIN * 2 + TITLE_HEIGHT;
+  const chartHeight = maxY - minY + MARGIN * 2 + headingHeight;
   const framedFooterHeight = Math.max(TITLE_BLOCK_HEIGHT, legendHeight + 10);
   const height = framed
     ? chartHeight + framedFooterHeight + FRAME_INSET
@@ -264,7 +265,7 @@ export async function buildSvg(
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="Segoe UI, Helvetica, Arial, sans-serif">
   <rect width="${width}" height="${height}" fill="#ffffff" />
   ${framed ? buildDrawingFrame(width, height) : ''}
-  <text x="${MARGIN}" y="${MARGIN}" font-size="20" font-weight="600" fill="#1a1d24">${escapeXml(title)}</text>
+  ${framed ? '' : `<text x="${MARGIN}" y="${MARGIN}" font-size="20" font-weight="600" fill="#1a1d24">${escapeXml(title)}</text>`}
   <g>
     ${edges}
   </g>
