@@ -1,6 +1,8 @@
 # Getting started with orgchartr
 
-This guide walks you through setting up orgchartr and building your first chart. It assumes no technical background — if you can install an app and follow a few steps, you can do this. It takes about 15 minutes, most of which is Docker installing.
+This guide walks you through setting up orgchartr and building your first chart. It assumes no technical background. Allow about 15 minutes, most of which is Docker installing.
+
+You need Chrome or Edge as your browser. Firefox and Safari cannot grant access to a local folder.
 
 If anything goes wrong, the [Troubleshooting section of the README](../README.md#troubleshooting) covers the common snags.
 
@@ -27,17 +29,20 @@ You should end up with a folder called `orgchartr` containing files like `README
 1. Open a terminal **in the orgchartr folder**:
    - **Windows:** in File Explorer, click the address bar, type `powershell`, and press Enter.
    - **macOS:** right-click the folder in Finder → *New Terminal at Folder* (or open Terminal and `cd` into it).
+   - **Linux:** right-click the folder in your file manager and choose *Open in Terminal*.
 2. Type this and press Enter:
-   ```
+   ```console
    docker compose up -d --build
    ```
 3. The first run downloads and builds things — this can take a few minutes. When it finishes and returns you to the prompt, orgchartr is running.
 
 ## Step 4 — Open it and choose your data folder
 
-Open Chrome or Edge and go to **http://localhost:3000**. Choose an empty folder to start fresh, or an existing orgchartr folder to continue. The browser reads and writes that folder directly; Docker never sees its contents.
+Open Chrome or Edge and go to **http://localhost:3000**. Select **Choose folder…**, then choose an empty folder to start fresh or an existing orgchartr data folder to continue. The browser reads and writes that folder directly; Docker never sees its contents.
 
 After granting access, you'll see the orgchartr dashboard. It's empty for now — let's fix that.
+
+The browser remembers your choice. If it asks for permission on a later visit, select **Reopen folder** and approve access. Cancelling the prompt does not delete your files. Use **Switch folder…** on the dashboard whenever you want to work from another folder.
 
 > orgchartr only opens on the computer it's running on. That's on purpose: it has no password, so it isn't exposed to anyone else on your network.
 
@@ -82,6 +87,7 @@ There are other formats too — PNG for a flat image, CSV for Excel, JSON for th
 
 - **Stop it** when you're done: run `docker compose down` in the orgchartr folder. Your data stays put.
 - **Start it again** anytime with `docker compose up -d` (no `--build` needed unless the app was updated).
+- **Back it up:** use **Export backup** on the dashboard, or close orgchartr and copy the whole data folder. Restore an exported backup by unzipping it and opening that folder.
 - **Search and filter** from the chart toolbar — non-matching people fade rather than disappear, so matches keep their place in the structure.
 - **Made a mistake?** Deleting a person gives you a few seconds to undo, and the **history** button restores earlier versions of a chart.
 
