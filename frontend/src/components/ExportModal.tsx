@@ -3,6 +3,7 @@ import type { Person, Sponsor } from '../types';
 import { api } from '../api/client';
 import { useModalDialog } from '../hooks/useModalDialog';
 import { buildSubset, getDescendantIds } from '../utils/orgTree';
+import { buildSponsorshipWorkbook } from '../utils/exportSponsorshipWorkbook';
 import {
   EXPORT_FORMATS,
   buildCsv,
@@ -94,6 +95,8 @@ export function ExportModal({ chartId, partnerName, people, sponsors, onClose }:
       const base = slugify(partnerName);
       if (format === 'csv') {
         downloadBlob(new Blob([buildCsv(exportPeople, sponsorById)], { type: 'text/csv;charset=utf-8' }), `${base}.csv`);
+      } else if (format === 'xlsx') {
+        downloadBlob(await buildSponsorshipWorkbook(exportPeople, sponsorById), `${base}.xlsx`);
       } else if (format === 'json') {
         downloadBlob(
           new Blob([buildJson(partnerName, exportPeople)], { type: 'application/json' }),

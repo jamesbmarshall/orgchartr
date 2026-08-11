@@ -4,12 +4,17 @@ import { photoUrl } from '../api/client';
 import { colorLegendEntries, readableTextColor } from './personColors';
 import { escapeSpreadsheetFormula } from './csv';
 
-export type ExportFormat = 'svg' | 'png' | 'csv' | 'json' | 'package';
+export type ExportFormat = 'svg' | 'png' | 'csv' | 'xlsx' | 'json' | 'package';
 
 export const EXPORT_FORMATS: { value: ExportFormat; label: string; hint: string }[] = [
   { value: 'svg', label: 'SVG (vector)', hint: 'Best for PowerPoint — insert as a picture and it stays sharp at any size.' },
   { value: 'png', label: 'PNG (image)', hint: 'Drop straight onto a slide when you want a flat picture.' },
   { value: 'csv', label: 'CSV (spreadsheet)', hint: 'One row per person, for Excel or bulk edits.' },
+  {
+    value: 'xlsx',
+    label: 'Excel sponsorship matrix',
+    hint: 'Filter a sponsor column to see everyone assigned to that sponsor.',
+  },
   { value: 'json', label: 'JSON (data)', hint: 'Full structured data, including positions and tags.' },
   {
     value: 'package',
