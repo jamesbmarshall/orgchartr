@@ -1,0 +1,9 @@
+services:
+  app:
+    image: orgchartr-local:dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
+        VITE_STORAGE_MODE: local

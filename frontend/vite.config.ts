@@ -1,5 +1,14 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import { readFileSync } from 'node:fs'
+
+const { version: appVersion } = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+) as { version: string }
+
+if (!appVersion?.trim()) {
+  throw new Error('The root package.json must contain a non-empty version.')
+}
 
 // https://vite.dev/config/
 export default defineConfig(({ command, mode }) => {
@@ -14,6 +23,7 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     define: {
+      'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion),
       'import.meta.env.VITE_STORAGE_MODE': JSON.stringify(storageMode),
     },
     plugins: [react()],

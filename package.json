@@ -1,7 +1,7 @@
 {
   "name": "orgchartr",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.9.0",
   "workspaces": [
     "shared",
     "frontend",
@@ -13,6 +13,7 @@
     "dev:frontend": "npm run dev -w frontend",
     "build": "npm run build -w shared && npm run build -w frontend && npm run build -w server",
     "build:shared": "npm run build -w shared",
+    "version:check": "node scripts/check-version.cjs",
     "verify:local-bundle": "node scripts/assert-local-bundle.cjs",
     "start": "npm run start -w server"
   },

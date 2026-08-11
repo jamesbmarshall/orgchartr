@@ -1,11 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
-        VITE_STORAGE_MODE: 'local'
+    image: ghcr.io/jamesbmarshall/orgchartr:${ORGCHARTR_VERSION:-latest}
     ports:
       # Local-folder mode relies on a browser user gesture, so expose the static app only to this
       # machine. Chart data is read and written by Chromium, never mounted into the container.

@@ -29,7 +29,17 @@ New here? Start with the plain-English [**Getting started guide**](docs/GETTING-
    ```
 3. **Open it in Chrome or Edge** at **http://localhost:3000**, choose a data folder, and grant read/write access.
 
-That's the whole setup. Docker only serves the app; your browser reads and writes the folder directly. To stop it later, run `docker compose down` (your data folder is left untouched).
+That's the whole setup. The script downloads the latest published orgchartr image and starts it. Docker only serves the app; your browser reads and writes the folder directly. To stop it later, run `docker compose down` (your data folder is left untouched).
+
+### Updates and version pinning
+
+Run the same start script again to download and start the latest release. To stay on a specific release, set `ORGCHARTR_VERSION` in the ignored `.env` file beside `docker-compose.yml`:
+
+```dotenv
+ORGCHARTR_VERSION=0.9.0
+```
+
+Run the start script again after changing it. Remove the setting, or change it to another published version, to move forwards. The version running on your machine appears at the bottom of every orgchartr screen.
 
 > **It runs on this computer only.** orgchartr has no login, so Docker deliberately publishes it only on this machine. See [Network access](#network-access) before changing that.
 
@@ -97,7 +107,7 @@ Photos are embedded in SVG and PNG exports. Portable packages include referenced
 ## Troubleshooting
 
 - **"docker: command not found" or the app won't start.** Docker Desktop isn't running. Start it and wait for its status to show *Running*, then run the start command above again.
-- **The Docker build reports an npm network error.** The start scripts use `NPM_REGISTRY` when set, otherwise your host npm registry when npm is installed, otherwise public npm. If your managed device has no host npm configuration, add `NPM_REGISTRY=https://your-company-package-feed/npm/` to the ignored `.env` file and rerun the script. The registry must mirror every version in `package-lock.json`.
+- **Docker can't pull the orgchartr image.** Check that Docker Desktop can reach `ghcr.io`, then rerun the start script. If your network blocks GHCR, build from source with `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`. Source builds use `NPM_REGISTRY` from your environment or ignored `.env` file when your organisation requires an npm mirror.
 - **Port 3000 is already in use.** Something else is using that port. Stop the other program, or change the published port in `docker-compose.yml` (for example `127.0.0.1:3001:8080`) and open http://localhost:3001 instead.
 - **The page is blank or won't load.** Give it a few seconds after `up` for the container to start, then refresh. Check it's running with `docker compose ps`; view logs with `docker compose logs -f`.
 - **Where's my data?** In the folder shown on the dashboard. Docker has no access to it; Chrome or Edge reads and writes it directly.
@@ -122,7 +132,7 @@ macOS or Linux:
 ```console
 npm install
 npm run build -w shared
-VITE_FORCE_LOCAL_MODE=true npm run build -w frontend
+VITE_STORAGE_MODE=local npm run build -w frontend
 ```
 
 PowerShell:
@@ -130,7 +140,7 @@ PowerShell:
 ```powershell
 npm install
 npm run build -w shared
-$env:VITE_FORCE_LOCAL_MODE = 'true'
+$env:VITE_STORAGE_MODE = 'local'
 npm run build -w frontend
 ```
 
@@ -160,6 +170,14 @@ Requires Node.js 20+:
 npm install
 npm run dev
 ```
+
+To build and run the production container from the current checkout rather than pulling a release:
+
+```console
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
+Maintainers should follow the [release guide](docs/RELEASING.md) when changing the application version or publishing an image.
 
 This runs the Express API on port 3001 and the Vite dev server (with hot reload) on 5173, proxying `/api` and `/photos` to the API. Open **http://localhost:5173**. Set `DATA_DIR` before `npm run dev` to use a folder other than `./data`.
 

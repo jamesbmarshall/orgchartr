@@ -41,7 +41,7 @@ You should end up with a folder called `orgchartr` containing files like `README
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\scripts\docker-up.ps1
    ```
-3. The first run downloads and builds things — this can take a few minutes. When it finishes and returns you to the prompt, orgchartr is running.
+3. The first run downloads the orgchartr app. This can take a few minutes. When it finishes and returns you to the prompt, orgchartr is running.
 
 ## Step 4 — Open it and choose your data folder
 
@@ -95,7 +95,9 @@ Choose **Excel sponsorship matrix** when you want to review relationship coverag
 ## Everyday tips
 
 - **Stop it** when you're done: run `docker compose down` in the orgchartr folder. Your data stays put.
-- **Start it again** anytime with `docker compose up -d` (no `--build` needed unless the app was updated).
+- **Start it again** anytime by running the same start script from Step 3.
+- **Update it** by running the start script again. It downloads the latest release before starting orgchartr. The version you're running appears at the bottom of each screen.
+- **Stay on one version** by adding a line such as `ORGCHARTR_VERSION=0.9.0` to the `.env` file in the orgchartr folder, then running the start script again.
 - **Back it up:** use **Export backup** on the dashboard, or close orgchartr and copy the whole data folder. Restore an exported backup by unzipping it and opening that folder.
 - **Search and filter** from the chart toolbar — non-matching people fade rather than disappear, so matches keep their place in the structure.
 - **Made a mistake?** Deleting a person gives you a few seconds to undo, and the **history** button restores earlier versions of a chart.
