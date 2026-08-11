@@ -44,6 +44,10 @@ body {
 }
 
 .app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
   flex: none;
   padding: 0.45rem 1rem;
   border-top: 1px solid var(--border);
@@ -54,8 +58,16 @@ body {
 }
 
 .app-footer a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   color: inherit;
   text-decoration: none;
+}
+
+.app-footer svg {
+  width: 13px;
+  height: 13px;
 }
 
 .app-footer a:hover {
