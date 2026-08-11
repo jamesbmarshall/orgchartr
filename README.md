@@ -9,16 +9,23 @@ New here? Start with the plain-English [**Getting started guide**](docs/GETTING-
 - One org chart per partner (or team) — add, edit, and remove people, and draw the reporting lines between them.
 - Each person carries a title, department, tags, a photo, free-text **notes** (decisions they own, how they like to be contacted, anything worth remembering), and links to one or more sponsors.
 - A shared, reusable sponsor directory you can link to any person on any chart.
-- Export a whole chart, or chosen branches and people, as SVG, PNG, CSV, or JSON.
+- Export a whole chart, or chosen branches and people, as SVG, PNG, CSV, Excel, or JSON.
 - Runs as a static site in Docker or on any web host; the app works entirely in your browser against a folder on your computer.
 - Stores its data in a folder you choose. The app never uploads, syncs, or backs up that folder for you.
 
 ## Quickstart
 
 1. **Install Docker Desktop.** Get it from [docker.com](https://www.docker.com/products/docker-desktop/) and start it (wait for the whale icon to settle).
-2. **Start orgchartr.** In a terminal, from this folder, run:
+2. **Start orgchartr.** In a terminal, from this folder, run the command for your system:
+
+   macOS or Linux:
    ```console
-   docker compose up -d --build
+   bash ./scripts/docker-up.sh
+   ```
+
+   Windows PowerShell:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\scripts\docker-up.ps1
    ```
 3. **Open it in Chrome or Edge** at **http://localhost:3000**, choose a data folder, and grant read/write access.
 
@@ -81,6 +88,7 @@ Open a chart and use **Export** in the toolbar. Export the entire chart, or tick
 | SVG | PowerPoint. Insert → Pictures → This device; it stays sharp at any size (and editable via Graphic → Convert to Shape). |
 | PNG | A flat picture for slides, docs, or chat. Rendered at 2× for crisp text. |
 | CSV | Excel, or bulk review of names, titles, managers, sponsors, notes, and tags. |
+| Excel sponsorship matrix | A filterable `.xlsx` workbook with one stakeholder per row and one column per sponsor. Filter a sponsor column to `X` to see everyone they cover. |
 | JSON | Structured data, including notes, tags, and saved positions. |
 | Portable package (ZIP) | Add the chart to another orgchartr installation, including sponsors, photos, and mappings. |
 
@@ -88,8 +96,8 @@ Photos are embedded in SVG and PNG exports. Portable packages include referenced
 
 ## Troubleshooting
 
-- **"docker: command not found" or the app won't start.** Docker Desktop isn't running. Start it and wait for its status to show *Running*, then try `docker compose up -d --build` again.
-- **npmjs.org is blocked on a managed device.** Docker does not inherit npm's host configuration. Add `NPM_REGISTRY=https://your-company-package-feed/npm/` to the ignored `.env` file, then rebuild. The registry must mirror every version in `package-lock.json`.
+- **"docker: command not found" or the app won't start.** Docker Desktop isn't running. Start it and wait for its status to show *Running*, then run the start command above again.
+- **The Docker build reports an npm network error.** The start scripts use `NPM_REGISTRY` when set, otherwise your host npm registry when npm is installed, otherwise public npm. If your managed device has no host npm configuration, add `NPM_REGISTRY=https://your-company-package-feed/npm/` to the ignored `.env` file and rerun the script. The registry must mirror every version in `package-lock.json`.
 - **Port 3000 is already in use.** Something else is using that port. Stop the other program, or change the published port in `docker-compose.yml` (for example `127.0.0.1:3001:8080`) and open http://localhost:3001 instead.
 - **The page is blank or won't load.** Give it a few seconds after `up` for the container to start, then refresh. Check it's running with `docker compose ps`; view logs with `docker compose logs -f`.
 - **Where's my data?** In the folder shown on the dashboard. Docker has no access to it; Chrome or Edge reads and writes it directly.

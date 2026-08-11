@@ -30,9 +30,16 @@ You should end up with a folder called `orgchartr` containing files like `README
    - **Windows:** in File Explorer, click the address bar, type `powershell`, and press Enter.
    - **macOS:** right-click the folder in Finder → *New Terminal at Folder* (or open Terminal and `cd` into it).
    - **Linux:** right-click the folder in your file manager and choose *Open in Terminal*.
-2. Type this and press Enter:
+2. Type the command for your system and press Enter.
+
+   **macOS or Linux:**
    ```console
-   docker compose up -d --build
+   bash ./scripts/docker-up.sh
+   ```
+
+   **Windows PowerShell:**
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\scripts\docker-up.ps1
    ```
 3. The first run downloads and builds things — this can take a few minutes. When it finishes and returns you to the prompt, orgchartr is running.
 
@@ -79,7 +86,9 @@ When you want the chart in PowerPoint:
 2. Choose the whole chart or tick specific people (optionally pulling in their reports or management chain).
 3. Pick **SVG** for PowerPoint (it stays crisp at any size), then insert it in your slide via **Insert → Pictures → This device**.
 
-There are other formats too — PNG for a flat image, CSV for Excel, JSON for the full data, and a portable ZIP for sharing a chart with another orgchartr user.
+There are other formats too — PNG for a flat image, CSV for detailed rows, JSON for the full data, and a portable ZIP for sharing a chart with another orgchartr user.
+
+Choose **Excel sponsorship matrix** when you want to review relationship coverage. The workbook has one stakeholder per row and one column per sponsor; filter a sponsor column to `X` to see everyone assigned to them. Your whole-chart or selected-branch choice applies to this export too.
 
 ---
 
