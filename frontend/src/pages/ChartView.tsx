@@ -16,8 +16,9 @@ import { Filter, History, Search, StickyNote, X } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
 import { useChartStore } from '../store/chartStore';
 import { useSponsorStore } from '../store/sponsorStore';
-import { computeAutoLayout } from '../layout/autoLayout';
+import { computeAutoLayout, getM1GridCells, personNodeWidth } from '../layout/autoLayout';
 import { PersonNode, type PersonNodeData } from '../components/PersonNode';
+import { ReportingEdge } from '../components/ReportingEdge';
 import { PersonModal } from '../components/PersonModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useUndoStore } from '../store/undoStore';
@@ -30,6 +31,7 @@ import { comparePeopleBySurname } from '../utils/personNames';
 import { getDescendantIds } from '../utils/orgTree';
 
 const nodeTypes = { person: PersonNode };
+const edgeTypes = { reporting: ReportingEdge };
 
 interface ChartViewState {
   search?: string;
@@ -190,6 +192,7 @@ export function ChartView() {
       return;
     }
     const autoPositions = computeAutoLayout(activeChart.people, false);
+    const m1GridCells = getM1GridCells(activeChart.people);
     const visibleIds = new Set(displayedPeople.map((person) => person.id));
     const newNodes: Node<PersonNodeData>[] = displayedPeople.map((person) => ({
       id: person.id,
@@ -214,10 +217,17 @@ export function ChartView() {
       .map((p) => {
         const dimmed =
           anyFilterActive && (!matchingIds.has(p.id) || !matchingIds.has(p.managerId as string));
+        const gridCell = m1GridCells.get(p.id);
         return {
           id: `${p.managerId}-${p.id}`,
           source: p.managerId as string,
           target: p.id,
+          ...(gridCell
+            ? {
+                type: 'reporting',
+                data: { row: gridCell.row, targetWidth: personNodeWidth(p.name) },
+              }
+            : {}),
           ...(dimmed ? { style: { opacity: 0.25 } } : {}),
         };
       });
@@ -486,6 +496,7 @@ export function ChartView() {
           onNodeDragStop={onNodeDragStop}
           onConnect={onConnect}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           colorMode="dark"
           deleteKeyCode={null}
           fitView

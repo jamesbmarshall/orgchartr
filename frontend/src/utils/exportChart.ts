@@ -1,5 +1,11 @@
 import type { Person, Sponsor } from '../types';
-import { computeAutoLayout, NODE_HEIGHT, personNodeWidth } from '../layout/autoLayout';
+import {
+  computeAutoLayout,
+  getM1GridCells,
+  NODE_HEIGHT,
+  personNodeWidth,
+  reportingEdgePath,
+} from '../layout/autoLayout';
 import { photoUrl } from '../api/client';
 import { colorLegendEntries, readableTextColor } from './personColors';
 import { escapeSpreadsheetFormula } from './csv';
@@ -148,6 +154,7 @@ export async function buildSvg(
   if (people.length === 0) throw new Error('Nothing to export — select at least one person.');
 
   const positions = computeAutoLayout(people, true);
+  const m1GridCells = getM1GridCells(people);
   const placed = people.map((person) => {
     const pos = positions.get(person.id) ?? { x: 0, y: 0 };
     return { person, x: pos.x, y: pos.y };
@@ -192,8 +199,11 @@ export async function buildSvg(
       const y1 = manager.y + offsetY + NODE_HEIGHT;
       const x2 = x + offsetX + personWidth / 2;
       const y2 = y + offsetY;
-      const mid = (y1 + y2) / 2;
-      return `<path d="M ${x1} ${y1} V ${mid} H ${x2} V ${y2}" fill="none" stroke="#b4bcc9" stroke-width="1.5" />`;
+      const gridCell = m1GridCells.get(person.id);
+      const path = gridCell
+        ? reportingEdgePath(x1, y1, x2, y2, personWidth, gridCell.row)
+        : `M ${x1} ${y1} V ${(y1 + y2) / 2} H ${x2} V ${y2}`;
+      return `<path d="${path}" fill="none" stroke="#b4bcc9" stroke-width="1.5" />`;
     })
     .join('\n    ');
 
