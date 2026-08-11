@@ -16,6 +16,6 @@
     "build": "tsc -p tsconfig.cjs.json && tsc -p tsconfig.esm.json && node write-dist-manifests.cjs"
   },
   "devDependencies": {
-    "typescript": "^5.6.3"
+    "typescript": "^7.0.2"
   }
 }
