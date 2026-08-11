@@ -68,7 +68,7 @@ export function SponsorModal({ sponsor, onSave, onClose }: SponsorModalProps) {
 
   return (
     <div className="modal-overlay" ref={overlayRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="sponsor-modal-title">
-      <div className="modal">
+      <div className="modal modal--person">
         <h2 id="sponsor-modal-title">{sponsor ? 'Edit sponsor' : 'Add sponsor'}</h2>
         {sponsor && (sponsor.createdAt || sponsor.updatedAt) && (
           <p className="timestamp-note">
@@ -77,7 +77,7 @@ export function SponsorModal({ sponsor, onSave, onClose }: SponsorModalProps) {
             {sponsor.updatedAt && `Last updated ${new Date(sponsor.updatedAt).toLocaleString()}`}
           </p>
         )}
-        <form onSubmit={handleSubmit}>
+        <form className="modal-form" onSubmit={handleSubmit}>
           <label>
             Name
             <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
@@ -90,7 +90,7 @@ export function SponsorModal({ sponsor, onSave, onClose }: SponsorModalProps) {
             Department
             <input value={department} onChange={(e) => setDepartment(e.target.value)} />
           </label>
-          <label>
+          <label className="modal-form__wide">
             Tags
             <div className="tag-input">
               <input

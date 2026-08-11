@@ -195,7 +195,7 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
 
   return (
     <div className="modal-overlay" ref={overlayRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="person-modal-title">
-      <div className="modal">
+      <div className="modal modal--person">
         <h2 id="person-modal-title">{person ? 'Edit person' : 'Add person'}</h2>
         {person && (person.createdAt || person.updatedAt) && (
           <p className="timestamp-note">
@@ -204,7 +204,7 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
             {person.updatedAt && `Last updated ${new Date(person.updatedAt).toLocaleString()}`}
           </p>
         )}
-        <form onSubmit={handleSubmit}>
+        <form className="modal-form modal-form--person" onSubmit={handleSubmit}>
           <label>
             Name
             <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
@@ -320,7 +320,7 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
               ))}
             </div>
           </label>
-          <label>
+          <label className="modal-form__wide">
             Notes
             <textarea
               value={notes}
@@ -330,7 +330,7 @@ export function PersonModal({ people, sponsors, person, onCreateSponsor, onSave,
               maxLength={4000}
             />
           </label>
-          <fieldset className="person-colors">
+          <fieldset className="person-colors modal-form__wide">
             <legend>Colour coding</legend>
             <label className="person-colors__toggle">
               <input

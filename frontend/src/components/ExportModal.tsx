@@ -134,116 +134,122 @@ export function ExportModal({ chartId, partnerName, people, sponsors, onClose }:
       <div className="modal modal--wide">
         <h2 id="export-title">Export org chart</h2>
 
-        <fieldset className="export-scope">
-          <legend>What to export</legend>
-          <label>
-            <input type="radio" name="scope" checked={scope === 'all'} onChange={() => setScope('all')} />
-            Entire chart ({people.length} {people.length === 1 ? 'person' : 'people'})
-          </label>
-          <label>
-            <input type="radio" name="scope" checked={scope === 'selection'} onChange={() => setScope('selection')} />
-            Selected branches or people
-          </label>
-        </fieldset>
-
-        {scope === 'selection' && (
-          <>
-            <div className="export-options">
+        <div className="export-layout">
+          <section className="export-layout__column">
+            <fieldset className="export-scope">
+              <legend>What to export</legend>
               <label>
-                <input
-                  type="checkbox"
-                  checked={includeDescendants}
-                  onChange={(e) => setIncludeDescendants(e.target.checked)}
-                />
-                Include everyone reporting into the selected people
+                <input type="radio" name="scope" checked={scope === 'all'} onChange={() => setScope('all')} />
+                Entire chart ({people.length} {people.length === 1 ? 'person' : 'people'})
               </label>
               <label>
-                <input
-                  type="checkbox"
-                  checked={includeAncestors}
-                  onChange={(e) => setIncludeAncestors(e.target.checked)}
-                />
-                Include their management chain
+                <input type="radio" name="scope" checked={scope === 'selection'} onChange={() => setScope('selection')} />
+                Selected branches or people
               </label>
-            </div>
+            </fieldset>
 
-            <div className="export-people">
-              {orderedPeople.map(({ person, depth }) => {
-                const reportCount = getDescendantIds(people, person.id).size;
-                return (
-                  <label key={person.id} className="export-people__row" style={{ paddingLeft: `${depth * 16}px` }}>
-                    <input type="checkbox" checked={selectedIds.has(person.id)} onChange={() => toggle(person.id)} />
-                    <span className="export-people__name">{person.name}</span>
-                    {person.title && <span className="export-people__meta">{person.title}</span>}
-                    {reportCount > 0 && <span className="export-people__meta">+{reportCount} reports</span>}
+            {scope === 'selection' && (
+              <>
+                <div className="export-options">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={includeDescendants}
+                      onChange={(e) => setIncludeDescendants(e.target.checked)}
+                    />
+                    Include everyone reporting into the selected people
                   </label>
-                );
-              })}
-            </div>
-          </>
-        )}
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={includeAncestors}
+                      onChange={(e) => setIncludeAncestors(e.target.checked)}
+                    />
+                    Include their management chain
+                  </label>
+                </div>
 
-        <fieldset className="export-scope">
-          <legend>Format</legend>
-          {EXPORT_FORMATS.map((option) => (
-            <label key={option.value}>
-              <input
-                type="radio"
-                name="format"
-                checked={format === option.value}
-                onChange={() => setFormat(option.value)}
-              />
-              {option.label}
-            </label>
-          ))}
-        </fieldset>
-        {activeFormat && <p className="export-hint">{activeFormat.hint}</p>}
+                <div className="export-people">
+                  {orderedPeople.map(({ person, depth }) => {
+                    const reportCount = getDescendantIds(people, person.id).size;
+                    return (
+                      <label key={person.id} className="export-people__row" style={{ paddingLeft: `${depth * 16}px` }}>
+                        <input type="checkbox" checked={selectedIds.has(person.id)} onChange={() => toggle(person.id)} />
+                        <span className="export-people__name">{person.name}</span>
+                        {person.title && <span className="export-people__meta">{person.title}</span>}
+                        {reportCount > 0 && <span className="export-people__meta">+{reportCount} reports</span>}
+                      </label>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </section>
 
-        {(format === 'svg' || format === 'png') && (
-          <fieldset className="export-scope">
-            <legend>Image style</legend>
-            <label>
-              <input
-                type="radio"
-                name="image-style"
-                checked={imageStyle === 'framed'}
-                onChange={() => setImageStyle('framed')}
-              />
-              Framed drawing
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="image-style"
-                checked={imageStyle === 'clean'}
-                onChange={() => setImageStyle('clean')}
-              />
-              Clean sheet
-            </label>
-          </fieldset>
-        )}
+          <section className="export-layout__column">
+            <fieldset className="export-scope">
+              <legend>Format</legend>
+              {EXPORT_FORMATS.map((option) => (
+                <label key={option.value}>
+                  <input
+                    type="radio"
+                    name="format"
+                    checked={format === option.value}
+                    onChange={() => setFormat(option.value)}
+                  />
+                  {option.label}
+                </label>
+              ))}
+            </fieldset>
+            {activeFormat && <p className="export-hint">{activeFormat.hint}</p>}
 
-        {(format === 'svg' || format === 'png') && imageStyle === 'framed' && (
-          <fieldset className="export-scope">
-            <legend>Drawing details</legend>
-            <div className="export-details">
-              <label>
-                Prepared by
-                <input
-                  value={preparedBy}
-                  onChange={(event) => setPreparedBy(event.target.value)}
-                  placeholder="Your name or team"
-                  maxLength={40}
-                />
-              </label>
-              <label>
-                Revision
-                <input value={revision} onChange={(event) => setRevision(event.target.value)} maxLength={12} />
-              </label>
-            </div>
-            <p className="export-hint">The chart name and export time are added automatically.</p>
-          </fieldset>
-        )}
+            {(format === 'svg' || format === 'png') && (
+              <fieldset className="export-scope">
+                <legend>Image style</legend>
+                <label>
+                  <input
+                    type="radio"
+                    name="image-style"
+                    checked={imageStyle === 'framed'}
+                    onChange={() => setImageStyle('framed')}
+                  />
+                  Framed drawing
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="image-style"
+                    checked={imageStyle === 'clean'}
+                    onChange={() => setImageStyle('clean')}
+                  />
+                  Clean sheet
+                </label>
+              </fieldset>
+            )}
+
+            {(format === 'svg' || format === 'png') && imageStyle === 'framed' && (
+              <fieldset className="export-scope">
+                <legend>Drawing details</legend>
+                <div className="export-details">
+                  <label>
+                    Prepared by
+                    <input
+                      value={preparedBy}
+                      onChange={(event) => setPreparedBy(event.target.value)}
+                      placeholder="Your name or team"
+                      maxLength={40}
+                    />
+                  </label>
+                  <label>
+                    Revision
+                    <input value={revision} onChange={(event) => setRevision(event.target.value)} maxLength={12} />
+                  </label>
+                </div>
+                <p className="export-hint">The chart name and export time are added automatically.</p>
+              </fieldset>
+            )}
+          </section>
+        </div>
 
         <p className="export-hint">
           {exportPeople.length} {exportPeople.length === 1 ? 'person' : 'people'} will be exported.
